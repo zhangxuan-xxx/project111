@@ -1,0 +1,21 @@
+# Visual Studio缓存
+.vs/
+x64/
+x86/
+Debug/
+Release/
+*.ipch
+*.vc.db
+*.vc.db-shm
+*.vc.db-wal
+*.obj
+*.ilk
+*.pdb
+*.exp
+*.lib
+
+# VS用户本地配置
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
