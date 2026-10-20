@@ -13,7 +13,9 @@ enum class LibraryComponentType
     OrGate,
     NotGate,
     NandGate,
-    XorGate
+    XorGate,
+    NorGate,
+    XnorGate
 };
 
 // ============================================================

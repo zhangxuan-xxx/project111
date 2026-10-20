@@ -1,4 +1,4 @@
-#include "ComponentLibrary.h"
+﻿#include "ComponentLibrary.h"
 
 // ============================================================
 // 获取元件库列表
@@ -11,7 +11,9 @@ const std::vector<ComponentInfo>& ComponentLibrary::GetComponents()
         { LibraryComponentType::OrGate,   "OR Gate" },
         { LibraryComponentType::NotGate,  "NOT Gate" },
         { LibraryComponentType::NandGate, "NAND Gate" },
-        { LibraryComponentType::XorGate,  "XOR Gate" }
+        { LibraryComponentType::XorGate,  "XOR Gate" },
+        { LibraryComponentType::NorGate,  "NOR Gate" },
+        { LibraryComponentType::XnorGate, "XNOR Gate" }
     };
 
     return components;
@@ -41,6 +43,12 @@ Gate* ComponentLibrary::CreateGate(
 
     case LibraryComponentType::XorGate:
         return new XORGate(position);
+
+    case LibraryComponentType::NorGate:
+        return new NORGate(position);
+
+    case LibraryComponentType::XnorGate:
+        return new XNORGate(position);
 
     default:
         return nullptr;

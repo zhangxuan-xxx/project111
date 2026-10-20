@@ -11,7 +11,8 @@
 enum ToolType
 {
     TOOL_SELECT,
-    TOOL_WIRE
+    TOOL_WIRE,
+    TOOL_TEXT
 };
 
 // ============================================================
@@ -70,8 +71,9 @@ enum GateType
     OR,
     NOT,
     NAND_GATE,
-    XOR_GATE
-
+    XOR_GATE,
+    NOR_GATE,
+    XNOR_GATE
 };
 
 // ============================================================
@@ -83,6 +85,9 @@ public:
     int id = -1;
 
     wxPoint center;
+
+    // 元件标号（如 U1），为空时按 id 自动显示
+    wxString label;
 
     double scale = 1.0;
 
@@ -676,5 +681,98 @@ public:
 
         gc->StrokePath(path);
         delete gc;
+    }
+};
+
+// ============================================================
+// NOR 或非门：或门 + 输出反相圆圈
+// ============================================================
+class NORGate : public Gate
+{
+public:
+    explicit NORGate(wxPoint center)
+        : Gate(center)
+    {
+        type = NOR_GATE;
+        scale = 1.0;
+    }
+
+    void drawSelf(wxMemoryDC& memDC) const override
+    {
+        // 复用或门的门体
+        ORGate body(center);
+        body.scale = scale;
+        body.drawSelf(memDC);
+
+        DrawInverterBubble(memDC);
+    }
+
+private:
+    void DrawInverterBubble(wxMemoryDC& memDC) const
+    {
+        const int bubbleX =
+            center.x + static_cast<int>(45 * scale);
+        const int bubbleY = center.y;
+        const int radius =
+            static_cast<int>(5 * scale);
+
+        // 白色填充盖住原来的输出线，再画反相圆圈
+        memDC.SetPen(wxPen(wxColour(0, 0, 0), 3));
+        memDC.SetBrush(*wxWHITE_BRUSH);
+        memDC.DrawEllipse(
+            bubbleX - radius, bubbleY - radius,
+            radius * 2, radius * 2);
+
+        memDC.SetBrush(*wxTRANSPARENT_BRUSH);
+        memDC.SetPen(wxPen(wxColour(0, 0, 0), 3));
+        memDC.DrawLine(
+            bubbleX + radius, bubbleY,
+            center.x + static_cast<int>(60 * scale), bubbleY);
+    }
+};
+
+// ============================================================
+// XNOR 同或门：异或门 + 输出反相圆圈
+// ============================================================
+class XNORGate : public Gate
+{
+public:
+    explicit XNORGate(wxPoint center)
+        : Gate(center)
+    {
+        type = XNOR_GATE;
+        scale = 1.0;
+    }
+
+    void drawSelf(wxMemoryDC& memDC) const override
+    {
+        // 复用异或门的门体
+        XORGate body(center);
+        body.scale = scale;
+        body.drawSelf(memDC);
+
+        DrawInverterBubble(memDC);
+    }
+
+private:
+    void DrawInverterBubble(wxMemoryDC& memDC) const
+    {
+        const int bubbleX =
+            center.x + static_cast<int>(45 * scale);
+        const int bubbleY = center.y;
+        const int radius =
+            static_cast<int>(5 * scale);
+
+        memDC.SetPen(wxPen(wxColour(0, 0, 0), 3));
+        memDC.SetBrush(*wxWHITE_BRUSH);
+        memDC.DrawEllipse(
+            bubbleX - radius, bubbleY - radius,
+            radius * 2, radius * 2);
+
+        memDC.SetBrush(*wxTRANSPARENT_BRUSH);
+        memDC.SetPen(wxPen(wxColour(0, 0, 0), 3));
+        memDC.DrawLine(
+            bubbleX + radius, bubbleY,
+            center.x + static_cast<int>(60 * scale), bubbleY);
     }
 };
