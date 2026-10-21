@@ -112,6 +112,7 @@ private:
     wxPoint m_wirePressPos;
     int m_wireStartComponentId = -1;
     std::vector<Wire> m_wires;
+    int m_selectedWire = -1;
 
     // 文字标注与选中状态
     std::vector<BoardText> m_texts;
@@ -155,6 +156,9 @@ private:
     void DeleteSelectedText();
     void EditText(int index);
     bool PromptForText(wxString& value, const wxString& initial);
+
+    // 连线命中判断
+    int FindWireAt(const wxPoint& pos) const;
 
     // 元件编辑辅助函数
     Gate* FindGateAt(const wxPoint& pos);

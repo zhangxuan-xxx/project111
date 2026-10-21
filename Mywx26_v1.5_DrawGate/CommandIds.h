@@ -87,5 +87,6 @@ enum
 
     // 右键菜单专用
     ID_CTX_EDIT_TEXT,
-    ID_CTX_DELETE_TEXT
+    ID_CTX_DELETE_TEXT,
+    ID_CTX_DELETE_WIRE
 };

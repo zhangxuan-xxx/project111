@@ -55,6 +55,7 @@ DrawBoard::DrawBoard(wxFrame* parent)
     m_wiring = false;
     m_draggingGate = false;
     m_selectedGate = nullptr;
+    m_selectedWire = -1;
     m_wireStartComponentId = -1;
 
     isDrawingAndGate = false;
@@ -130,10 +131,11 @@ void DrawBoard::OnPaint(wxPaintEvent& event)
         delete gc;
     }
 
-    // 绘制已有连线
-    for (const Wire& wire : m_wires)
+    // 绘制已有连线（右键选中的线用现有活动色高亮）
+    for (int i = 0; i < static_cast<int>(m_wires.size()); ++i)
     {
-        wire.Draw(memDC);
+        m_wires[i].isActive = (i == m_selectedWire);
+        m_wires[i].Draw(memDC);
     }
 
     // 绘制逻辑门
@@ -349,6 +351,7 @@ void DrawBoard::ClearAll()
 
     m_selectedGate = nullptr;
     m_selectedText = -1;
+    m_selectedWire = -1;
     m_draggingGate = false;
     m_wiring = false;
     m_wireStartComponentId = -1;
@@ -505,6 +508,7 @@ void DrawBoard::OnMouseMove(wxMouseEvent& event)
 void DrawBoard::OnMouseDown(wxMouseEvent& event)
 {
     m_mousePos = event.GetPosition();
+    m_selectedWire = -1;
     SetFocus();
 
     // -------------------------------------------------
@@ -744,6 +748,57 @@ int DrawBoard::FindTextAt(const wxPoint& pos) const
     return -1;
 }
 
+// =====================================================
+// 连线命中判断：检查鼠标是否落在折线的任一段附近
+// =====================================================
+int DrawBoard::FindWireAt(const wxPoint& pos) const
+{
+    const int hitTolerance = 6;
+
+    auto between = [](int value, int first, int second, int tolerance)
+    {
+        const int low = std::min(first, second) - tolerance;
+        const int high = std::max(first, second) + tolerance;
+        return value >= low && value <= high;
+    };
+
+    for (int i = static_cast<int>(m_wires.size()) - 1; i >= 0; --i)
+    {
+        const Wire& wire = m_wires[i];
+        const int midX = (wire.start.x + wire.end.x) / 2;
+
+        const wxPoint points[] =
+        {
+            wire.start,
+            wxPoint(midX, wire.start.y),
+            wxPoint(midX, wire.end.y),
+            wire.end
+        };
+
+        for (int segment = 0; segment < 3; ++segment)
+        {
+            const wxPoint& first = points[segment];
+            const wxPoint& second = points[segment + 1];
+
+            if (first.y == second.y &&
+                between(pos.y, first.y, second.y, hitTolerance) &&
+                between(pos.x, first.x, second.x, hitTolerance))
+            {
+                return i;
+            }
+
+            if (first.x == second.x &&
+                between(pos.x, first.x, second.x, hitTolerance) &&
+                between(pos.y, first.y, second.y, hitTolerance))
+            {
+                return i;
+            }
+        }
+    }
+
+    return -1;
+}
+
 void DrawBoard::DeleteSelectedText()
 {
     if (m_selectedText < 0 ||
@@ -809,16 +864,29 @@ void DrawBoard::OnRightClick(wxMouseEvent& event)
 
     const int textIndex = FindTextAt(m_mousePos);
     Gate* const gate = FindGateAt(m_mousePos);
+    const int wireIndex = FindWireAt(m_mousePos);
 
     if (gate != nullptr)
     {
         m_selectedGate = gate;
         m_selectedText = -1;
+        m_selectedWire = -1;
     }
     else if (textIndex >= 0)
     {
         m_selectedText = textIndex;
         m_selectedGate = nullptr;
+        m_selectedWire = -1;
+    }
+    else if (wireIndex >= 0)
+    {
+        m_selectedWire = wireIndex;
+        m_selectedGate = nullptr;
+        m_selectedText = -1;
+    }
+    else
+    {
+        m_selectedWire = -1;
     }
 
     Refresh(false);
@@ -845,6 +913,10 @@ void DrawBoard::OnRightClick(wxMouseEvent& event)
     {
         menu.Append(ID_CTX_EDIT_TEXT, wxT("编辑文字..."));
         menu.Append(ID_CTX_DELETE_TEXT, wxT("删除文字"));
+    }
+    else if (wireIndex >= 0)
+    {
+        menu.Append(ID_CTX_DELETE_WIRE, wxT("删除连线"));
     }
     else
     {
@@ -898,6 +970,16 @@ void DrawBoard::OnRightClick(wxMouseEvent& event)
 
     case ID_CTX_DELETE_TEXT:
         DeleteSelectedText();
+        return;
+
+    case ID_CTX_DELETE_WIRE:
+        if (m_selectedWire >= 0 &&
+            m_selectedWire < static_cast<int>(m_wires.size()))
+        {
+            m_wires.erase(m_wires.begin() + m_selectedWire);
+        }
+        m_selectedWire = -1;
+        Refresh(false);
         return;
 
     case ID_EDIT_DELETE:
