@@ -1,0 +1,209 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1220" viewBox="0 0 1800 1220">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#202635"/><stop offset="1" stop-color="#30394B"/></linearGradient>
+<linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#424B60"/><stop offset="1" stop-color="#303747"/></linearGradient>
+<linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#4C566C"/><stop offset="1" stop-color="#303747"/></linearGradient>
+<filter id="shadow" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur in="SourceAlpha" stdDeviation="9"/><feOffset dy="10"/><feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs><rect width="100%" height="100%" fill="url(#bg)"/>
+<rect x="18" y="18" width="1764" height="1184" rx="14" fill="none" stroke="#D9BF75" stroke-width="2"/>
+<rect x="36" y="44" width="1728" height="92" rx="18" fill="#101522" opacity=".5" filter="url(#shadow)"/><rect x="36" y="34" width="1728" height="92" rx="18" fill="url(#panel)" stroke="#8490A8" stroke-width="2"/>
+<text x="68" y="80" text-anchor="start" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="27" font-weight="400" font-style="normal" fill="#F4F6FB">(a)</text>
+<text x="900.0" y="68" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="36" font-weight="700" font-style="normal" fill="#F4F6FB">DMF Module</text>
+<text x="900.0" y="105" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="400" font-style="normal" fill="#E7E7ED">(Dynamic Multi-scale Fusion)</text>
+<rect x="36" y="154" width="1728" height="866" rx="24" fill="#101522" opacity=".5" filter="url(#shadow)"/><rect x="36" y="144" width="1728" height="866" rx="24" fill="url(#panel)" stroke="#929CB1" stroke-width="2"/>
+<rect x="258" y="194" width="710" height="215" rx="20" fill="#101522" opacity=".5" filter="url(#shadow)"/><rect x="258" y="184" width="710" height="215" rx="20" fill="url(#panel)" stroke="#66A8FF" stroke-width="2"/>
+<rect x="283" y="264" width="155" height="68" rx="12" fill="#365578" stroke="#DCE9F6" stroke-width="2" filter="url(#shadow)"/><rect x="280" y="257" width="155" height="68" rx="12" fill="#66A8FF" stroke="#DCE9F6" stroke-width="2"/>
+<text x="357" y="279.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" fill="#F4F6FB">3 × 3</text>
+<text x="357" y="303.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" fill="#F4F6FB">DWConv</text>
+<polyline points="440,291 482,291" fill="none" stroke="#202635" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="482,291 466,281 466,301" fill="#202635" stroke="none" stroke-width="1"/>
+<polygon points="497,263.65 563.5,277.9 563.5,333 497,315.9" fill="#4F83C6" stroke="#1D2636" stroke-width="2"/>
+<polygon points="563.5,277.9 592,251.3 592,306.4 563.5,333" fill="#385C8C" stroke="#1D2636" stroke-width="2"/>
+<polygon points="523.6,238 592,251.3 563.5,277.9 497,263.65" fill="#7CCCFF" stroke="#91BFF3" stroke-width="2"/>
+<polyline points="497,263.65 523.6,238 592,251.3" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="530.25,265.55 530.25,322.55" fill="none" stroke="#E7F4FF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="562.55,277.9 562.55,332.05" fill="none" stroke="#D6EBFF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="545" y="355" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" font-style="italic" fill="#202635">H × W × C</text>
+<polyline points="600,291 655,291" fill="none" stroke="#202635" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="655,291 639,281 639,301" fill="#202635" stroke="none" stroke-width="1"/>
+<text x="627" y="268" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" font-style="italic" fill="#202635">F₃</text>
+<polygon points="671,263.65 737.5,277.9 737.5,333 671,315.9" fill="#4F83C6" stroke="#1D2636" stroke-width="2"/>
+<polygon points="737.5,277.9 766,251.3 766,306.4 737.5,333" fill="#385C8C" stroke="#1D2636" stroke-width="2"/>
+<polygon points="697.6,238 766,251.3 737.5,277.9 671,263.65" fill="#7CCCFF" stroke="#91BFF3" stroke-width="2"/>
+<polyline points="671,263.65 697.6,238 766,251.3" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="704.25,265.55 704.25,322.55" fill="none" stroke="#E7F4FF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="736.55,277.9 736.55,332.05" fill="none" stroke="#D6EBFF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="719" y="355" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" font-style="italic" fill="#202635">H × W × C</text>
+<rect x="258" y="435" width="710" height="215" rx="20" fill="#101522" opacity=".5" filter="url(#shadow)"/><rect x="258" y="425" width="710" height="215" rx="20" fill="url(#panel)" stroke="#FFAE51" stroke-width="2"/>
+<rect x="283" y="505" width="155" height="68" rx="12" fill="#8C5C24" stroke="#DCE9F6" stroke-width="2" filter="url(#shadow)"/><rect x="280" y="498" width="155" height="68" rx="12" fill="#FFAE51" stroke="#DCE9F6" stroke-width="2"/>
+<text x="357" y="520.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" fill="#F4F6FB">5 × 5</text>
+<text x="357" y="544.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" fill="#F4F6FB">DWConv</text>
+<polyline points="440,532 482,532" fill="none" stroke="#202635" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="482,532 466,522 466,542" fill="#202635" stroke="none" stroke-width="1"/>
+<polygon points="497,504.65 563.5,518.9 563.5,574 497,556.9" fill="#C6873F" stroke="#1D2636" stroke-width="2"/>
+<polygon points="563.5,518.9 592,492.3 592,547.4 563.5,574" fill="#8C5F2C" stroke="#1D2636" stroke-width="2"/>
+<polygon points="523.6,479 592,492.3 563.5,518.9 497,504.65" fill="#FFD462" stroke="#91BFF3" stroke-width="2"/>
+<polyline points="497,504.65 523.6,479 592,492.3" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="530.25,506.55 530.25,563.55" fill="none" stroke="#E7F4FF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="562.55,518.9 562.55,573.05" fill="none" stroke="#D6EBFF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="545" y="596" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" font-style="italic" fill="#202635">H × W × C</text>
+<polyline points="600,532 655,532" fill="none" stroke="#202635" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="655,532 639,522 639,542" fill="#202635" stroke="none" stroke-width="1"/>
+<text x="627" y="509" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" font-style="italic" fill="#202635">F₅</text>
+<polygon points="671,504.65 737.5,518.9 737.5,574 671,556.9" fill="#C6873F" stroke="#1D2636" stroke-width="2"/>
+<polygon points="737.5,518.9 766,492.3 766,547.4 737.5,574" fill="#8C5F2C" stroke="#1D2636" stroke-width="2"/>
+<polygon points="697.6,479 766,492.3 737.5,518.9 671,504.65" fill="#FFD462" stroke="#91BFF3" stroke-width="2"/>
+<polyline points="671,504.65 697.6,479 766,492.3" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="704.25,506.55 704.25,563.55" fill="none" stroke="#E7F4FF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="736.55,518.9 736.55,573.05" fill="none" stroke="#D6EBFF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="719" y="596" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" font-style="italic" fill="#202635">H × W × C</text>
+<rect x="258" y="676" width="710" height="215" rx="20" fill="#101522" opacity=".5" filter="url(#shadow)"/><rect x="258" y="666" width="710" height="215" rx="20" fill="url(#panel)" stroke="#50D894" stroke-width="2"/>
+<rect x="283" y="746" width="155" height="68" rx="12" fill="#286846" stroke="#DCE9F6" stroke-width="2" filter="url(#shadow)"/><rect x="280" y="739" width="155" height="68" rx="12" fill="#50D894" stroke="#DCE9F6" stroke-width="2"/>
+<text x="357" y="761.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" fill="#F4F6FB">7 × 7</text>
+<text x="357" y="785.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" fill="#F4F6FB">DWConv</text>
+<polyline points="440,773 482,773" fill="none" stroke="#202635" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="482,773 466,763 466,783" fill="#202635" stroke="none" stroke-width="1"/>
+<polygon points="497,745.65 563.5,759.9 563.5,815 497,797.9" fill="#3EA873" stroke="#1D2636" stroke-width="2"/>
+<polygon points="563.5,759.9 592,733.3 592,788.4 563.5,815" fill="#2C7651" stroke="#1D2636" stroke-width="2"/>
+<polygon points="523.6,720 592,733.3 563.5,759.9 497,745.65" fill="#61FFB4" stroke="#91BFF3" stroke-width="2"/>
+<polyline points="497,745.65 523.6,720 592,733.3" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="530.25,747.55 530.25,804.55" fill="none" stroke="#E7F4FF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="562.55,759.9 562.55,814.05" fill="none" stroke="#D6EBFF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="545" y="837" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" font-style="italic" fill="#202635">H × W × C</text>
+<polyline points="600,773 655,773" fill="none" stroke="#202635" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="655,773 639,763 639,783" fill="#202635" stroke="none" stroke-width="1"/>
+<text x="627" y="750" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" font-style="italic" fill="#202635">F₇</text>
+<polygon points="671,745.65 737.5,759.9 737.5,815 671,797.9" fill="#3EA873" stroke="#1D2636" stroke-width="2"/>
+<polygon points="737.5,759.9 766,733.3 766,788.4 737.5,815" fill="#2C7651" stroke="#1D2636" stroke-width="2"/>
+<polygon points="697.6,720 766,733.3 737.5,759.9 671,745.65" fill="#61FFB4" stroke="#91BFF3" stroke-width="2"/>
+<polyline points="671,745.65 697.6,720 766,733.3" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="704.25,747.55 704.25,804.55" fill="none" stroke="#E7F4FF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="736.55,759.9 736.55,814.05" fill="none" stroke="#D6EBFF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="719" y="837" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" font-style="italic" fill="#202635">H × W × C</text>
+<polygon points="72,537.05 152.5,554.3 152.5,621 72,600.3" fill="#806BC6" stroke="#1D2636" stroke-width="2"/>
+<polygon points="152.5,554.3 187,522.1 187,588.8 152.5,621" fill="#5A4B8C" stroke="#1D2636" stroke-width="2"/>
+<polygon points="104.2,506 187,522.1 152.5,554.3 72,537.05" fill="#C9A8FF" stroke="#91BFF3" stroke-width="2"/>
+<polyline points="72,537.05 104.2,506 187,522.1" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="112.25,539.35 112.25,608.35" fill="none" stroke="#E7F4FF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="151.35,554.3 151.35,619.85" fill="none" stroke="#D6EBFF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="129" y="648" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" font-style="italic" fill="#F4F6FB">X</text>
+<text x="129" y="675" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" font-style="italic" fill="#F4F6FB">H × W × C</text>
+<polyline points="188,565 224,565" fill="none" stroke="#202635" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="224,291 224,773" fill="none" stroke="#202635" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="224,291 258,291" fill="none" stroke="#202635" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="258,291 242,281 242,301" fill="#202635" stroke="none" stroke-width="1"/>
+<polyline points="224,532 258,532" fill="none" stroke="#202635" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="258,532 242,522 242,542" fill="#202635" stroke="none" stroke-width="1"/>
+<polyline points="224,773 258,773" fill="none" stroke="#202635" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="258,773 242,763 242,783" fill="#202635" stroke="none" stroke-width="1"/>
+<polyline points="766,291 1004,291" fill="none" stroke="#758198" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="766,532 1004,532" fill="none" stroke="#758198" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="766,773 1004,773" fill="none" stroke="#758198" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1004,291 1004,773" fill="none" stroke="#758198" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1004,354 1050,354" fill="none" stroke="#D58AFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1050,354 1034,344 1034,364" fill="#D58AFF" stroke="none" stroke-width="1"/>
+<rect x="1030" y="174" width="720" height="386" rx="24" fill="#101522" opacity=".5" filter="url(#shadow)"/><rect x="1030" y="164" width="720" height="386" rx="24" fill="url(#panel)" stroke="#8894AA" stroke-width="2"/>
+<rect x="1050" y="192" width="680" height="58" rx="14" fill="#101522" opacity=".5" filter="url(#shadow)"/><rect x="1050" y="182" width="680" height="58" rx="14" fill="url(#panel)" stroke="none" stroke-width="0"/>
+<text x="1080" y="211" text-anchor="start" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="700" font-style="normal" fill="#202635">Dynamic Weight Generation</text>
+<rect x="1060" y="297" width="112" height="104" rx="13" fill="#83B8F1" stroke="#65728B" stroke-width="2" filter="url(#shadow)"/><rect x="1057" y="290" width="112" height="104" rx="13" fill="#D2E9FF" stroke="#65728B" stroke-width="2"/>
+<text x="1113.0" y="332.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" font-style="normal" fill="#202635">Global</text>
+<text x="1113.0" y="352.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" font-style="normal" fill="#202635">Avg Pool</text>
+<rect x="1188" y="297" width="92" height="104" rx="13" fill="#F7C64F" stroke="#65728B" stroke-width="2" filter="url(#shadow)"/><rect x="1185" y="290" width="92" height="104" rx="13" fill="#FFF0B2" stroke="#65728B" stroke-width="2"/>
+<text x="1231.0" y="332.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" font-style="normal" fill="#202635">1 × 1</text>
+<text x="1231.0" y="352.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" font-style="normal" fill="#202635">Conv</text>
+<rect x="1294" y="297" width="82" height="104" rx="13" fill="#EE79C2" stroke="#65728B" stroke-width="2" filter="url(#shadow)"/><rect x="1291" y="290" width="82" height="104" rx="13" fill="#FFC1E8" stroke="#65728B" stroke-width="2"/>
+<text x="1332.0" y="342.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" font-style="normal" fill="#202635">SiLU</text>
+<rect x="1390" y="297" width="92" height="104" rx="13" fill="#F7C64F" stroke="#65728B" stroke-width="2" filter="url(#shadow)"/><rect x="1387" y="290" width="92" height="104" rx="13" fill="#FFF0B2" stroke="#65728B" stroke-width="2"/>
+<text x="1433.0" y="332.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" font-style="normal" fill="#202635">1 × 1</text>
+<text x="1433.0" y="352.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" font-style="normal" fill="#202635">Conv</text>
+<rect x="1496" y="297" width="92" height="104" rx="13" fill="#9E8BEF" stroke="#65728B" stroke-width="2" filter="url(#shadow)"/><rect x="1493" y="290" width="92" height="104" rx="13" fill="#DBD0FF" stroke="#65728B" stroke-width="2"/>
+<text x="1539.0" y="342.0" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" font-style="normal" fill="#202635">Softmax</text>
+<polyline points="1169,342 1184,342" fill="none" stroke="#D58AFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1184,342 1168,332 1168,352" fill="#D58AFF" stroke="none" stroke-width="1"/>
+<polyline points="1277,342 1290,342" fill="none" stroke="#D58AFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1290,342 1274,332 1274,352" fill="#D58AFF" stroke="none" stroke-width="1"/>
+<polyline points="1373,342 1386,342" fill="none" stroke="#D58AFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1386,342 1370,332 1370,352" fill="#D58AFF" stroke="none" stroke-width="1"/>
+<polyline points="1479,342 1492,342" fill="none" stroke="#D58AFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1492,342 1476,332 1476,352" fill="#D58AFF" stroke="none" stroke-width="1"/>
+<polyline points="1585,342 1600,342" fill="none" stroke="#D58AFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1600,342 1584,332 1584,352" fill="#D58AFF" stroke="none" stroke-width="1"/>
+<rect x="1604" y="286" width="105" height="48" rx="10" fill="#3266A6" stroke="#A6B6CE" stroke-width="2" filter="url(#shadow)"/><rect x="1601" y="280" width="105" height="48" rx="10" fill="#66A8FF" stroke="#A6B6CE" stroke-width="2"/>
+<text x="1653" y="304" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" font-style="italic" fill="#F4F6FB">W₃</text>
+<rect x="1604" y="348" width="105" height="48" rx="10" fill="#9B5D17" stroke="#A6B6CE" stroke-width="2" filter="url(#shadow)"/><rect x="1601" y="342" width="105" height="48" rx="10" fill="#FFAE51" stroke="#A6B6CE" stroke-width="2"/>
+<text x="1653" y="366" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" font-style="italic" fill="#F4F6FB">W₅</text>
+<rect x="1604" y="410" width="105" height="48" rx="10" fill="#26754C" stroke="#A6B6CE" stroke-width="2" filter="url(#shadow)"/><rect x="1601" y="404" width="105" height="48" rx="10" fill="#50D894" stroke="#A6B6CE" stroke-width="2"/>
+<text x="1653" y="428" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" font-style="italic" fill="#F4F6FB">W₇</text>
+<polyline points="1706,304 1720,304 1720,491 1315,491 1315,578" fill="none" stroke="#D58AFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1315,578 1305,562 1325,562" fill="#D58AFF" stroke="none" stroke-width="1"/>
+<rect x="1030" y="598" width="590" height="397" rx="24" fill="#101522" opacity=".5" filter="url(#shadow)"/><rect x="1030" y="588" width="590" height="397" rx="24" fill="url(#panel)" stroke="#8894AA" stroke-width="2"/>
+<rect x="1050" y="616" width="550" height="56" rx="14" fill="#101522" opacity=".5" filter="url(#shadow)"/><rect x="1050" y="606" width="550" height="56" rx="14" fill="url(#panel)" stroke="none" stroke-width="0"/>
+<text x="1080" y="634" text-anchor="start" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="700" font-style="normal" fill="#202635">Weighted Fusion</text>
+<rect x="1073" y="695" width="112" height="60" rx="14" fill="#31587F" stroke="#B8C7DB" stroke-width="2" filter="url(#shadow)"/><rect x="1070" y="688" width="112" height="60" rx="14" fill="#66A8FF" stroke="#B8C7DB" stroke-width="2"/>
+<text x="1126" y="718" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" font-style="italic" fill="#F4F6FB">F₃</text>
+<polyline points="1004,718 1069,718" fill="none" stroke="#66A8FF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1069,718 1053,708 1053,728" fill="#66A8FF" stroke="none" stroke-width="1"/>
+<circle cx="1236" cy="718" r="24" fill="#EEF2FA" stroke="#D58AFF" stroke-width="3" filter="url(#shadow)"/>
+<text x="1236" y="718" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="700" font-style="normal" fill="#202635">×</text>
+<text x="1288" y="718" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" font-style="italic" fill="#66A8FF">W₃</text>
+<polyline points="1182,718 1210,718" fill="none" stroke="#66A8FF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1210,718 1194,708 1194,728" fill="#66A8FF" stroke="none" stroke-width="1"/>
+<polyline points="1316,718 1432,718" fill="none" stroke="#66A8FF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<rect x="1073" y="794" width="112" height="60" rx="14" fill="#8D5B20" stroke="#B8C7DB" stroke-width="2" filter="url(#shadow)"/><rect x="1070" y="787" width="112" height="60" rx="14" fill="#FFAE51" stroke="#B8C7DB" stroke-width="2"/>
+<text x="1126" y="817" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" font-style="italic" fill="#F4F6FB">F₅</text>
+<polyline points="1004,817 1069,817" fill="none" stroke="#FFAE51" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1069,817 1053,807 1053,827" fill="#FFAE51" stroke="none" stroke-width="1"/>
+<circle cx="1236" cy="817" r="24" fill="#EEF2FA" stroke="#D58AFF" stroke-width="3" filter="url(#shadow)"/>
+<text x="1236" y="817" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="700" font-style="normal" fill="#202635">×</text>
+<text x="1288" y="817" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" font-style="italic" fill="#FFAE51">W₅</text>
+<polyline points="1182,817 1210,817" fill="none" stroke="#FFAE51" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1210,817 1194,807 1194,827" fill="#FFAE51" stroke="none" stroke-width="1"/>
+<polyline points="1316,817 1432,817" fill="none" stroke="#FFAE51" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<rect x="1073" y="893" width="112" height="60" rx="14" fill="#286545" stroke="#B8C7DB" stroke-width="2" filter="url(#shadow)"/><rect x="1070" y="886" width="112" height="60" rx="14" fill="#50D894" stroke="#B8C7DB" stroke-width="2"/>
+<text x="1126" y="916" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" font-style="italic" fill="#F4F6FB">F₇</text>
+<polyline points="1004,916 1069,916" fill="none" stroke="#50D894" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1069,916 1053,906 1053,926" fill="#50D894" stroke="none" stroke-width="1"/>
+<circle cx="1236" cy="916" r="24" fill="#EEF2FA" stroke="#D58AFF" stroke-width="3" filter="url(#shadow)"/>
+<text x="1236" y="916" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="700" font-style="normal" fill="#202635">×</text>
+<text x="1288" y="916" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" font-style="italic" fill="#50D894">W₇</text>
+<polyline points="1182,916 1210,916" fill="none" stroke="#50D894" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1210,916 1194,906 1194,926" fill="#50D894" stroke="none" stroke-width="1"/>
+<polyline points="1316,916 1432,916" fill="none" stroke="#50D894" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polyline points="1432,718 1432,916" fill="none" stroke="#202635" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1480" cy="822" r="30" fill="#EEF2FA" stroke="#D58AFF" stroke-width="3" filter="url(#shadow)"/>
+<text x="1480" y="822" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="30" font-weight="700" font-style="normal" fill="#202635">+</text>
+<polyline points="1432,822 1449,822" fill="none" stroke="#202635" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="1449,822 1433,812 1433,832" fill="#202635" stroke="none" stroke-width="1"/>
+<text x="1552" y="822" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" font-style="italic" fill="#D58AFF">Y</text>
+<polyline points="1511,822 1640,822" fill="none" stroke="#D58AFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+<polygon points="1640,822 1624,812 1624,832" fill="#D58AFF" stroke="none" stroke-width="1"/>
+<polygon points="1652,775.7 1729.0,792.2 1729.0,856 1652,836.2" fill="#806BC6" stroke="#1D2636" stroke-width="2"/>
+<polygon points="1729.0,792.2 1762,761.4 1762,825.2 1729.0,856" fill="#5A4B8C" stroke="#1D2636" stroke-width="2"/>
+<polygon points="1682.8,746 1762,761.4 1729.0,792.2 1652,775.7" fill="#C9A8FF" stroke="#91BFF3" stroke-width="2"/>
+<polyline points="1652,775.7 1682.8,746 1762,761.4" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1690.5,777.9 1690.5,843.9" fill="none" stroke="#E7F4FF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1727.9,792.2 1727.9,854.9" fill="none" stroke="#D6EBFF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1707" y="886" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" font-style="italic" fill="#F4F6FB">Y</text>
+<text x="1707" y="913" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" font-style="italic" fill="#F4F6FB">H × W × C</text>
+<rect x="36" y="1042" width="1728" height="150" rx="22" fill="#101522" opacity=".5" filter="url(#shadow)"/><rect x="36" y="1032" width="1728" height="150" rx="22" fill="url(#panel)" stroke="#8290A8" stroke-width="2"/>
+<polygon points="75,1084.31 112.1,1092.26 112.1,1123 75,1113.46" fill="#4F83C6" stroke="#1D2636" stroke-width="2"/>
+<polygon points="112.1,1092.26 128,1077.42 128,1108.16 112.1,1123" fill="#385C8C" stroke="#1D2636" stroke-width="2"/>
+<polygon points="89.84,1070 128,1077.42 112.1,1092.26 75,1084.31" fill="#7CCCFF" stroke="#91BFF3" stroke-width="2"/>
+<polyline points="75,1084.31 89.84,1070 128,1077.42" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="93.55,1085.37 93.55,1117.17" fill="none" stroke="#E7F4FF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="111.57,1092.26 111.57,1122.47" fill="none" stroke="#D6EBFF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="147" y="1104" text-anchor="start" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" font-style="normal" fill="#F4F6FB">Feature map</text>
+<rect x="333" y="1081" width="52" height="52" rx="9" fill="#8A742C" stroke="#AEB8CA" stroke-width="2" filter="url(#shadow)"/><rect x="330" y="1076" width="52" height="52" rx="9" fill="#FFD76C" stroke="#AEB8CA" stroke-width="2"/>
+<text x="398" y="1104" text-anchor="start" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" font-style="normal" fill="#F4F6FB">1 × 1 Conv</text>
+<rect x="568" y="1081" width="52" height="52" rx="9" fill="#9D4E85" stroke="#AEB8CA" stroke-width="2" filter="url(#shadow)"/><rect x="565" y="1076" width="52" height="52" rx="9" fill="#FF8DD3" stroke="#AEB8CA" stroke-width="2"/>
+<text x="633" y="1104" text-anchor="start" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" font-style="normal" fill="#F4F6FB">SiLU</text>
+<rect x="773" y="1081" width="52" height="52" rx="9" fill="#6552AE" stroke="#AEB8CA" stroke-width="2" filter="url(#shadow)"/><rect x="770" y="1076" width="52" height="52" rx="9" fill="#A58AFF" stroke="#AEB8CA" stroke-width="2"/>
+<text x="838" y="1104" text-anchor="start" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" font-style="normal" fill="#F4F6FB">Softmax</text>
+<circle cx="1026" cy="1102" r="26" fill="#EEF2FA" stroke="#D58AFF" stroke-width="3"/>
+<text x="1026" y="1102" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="27" font-weight="700" font-style="normal" fill="#202635">×</text>
+<text x="1064" y="1104" text-anchor="start" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" font-style="normal" fill="#F4F6FB">Element-wise multiplication</text>
+<circle cx="1421" cy="1102" r="26" fill="#EEF2FA" stroke="#D58AFF" stroke-width="3"/>
+<text x="1421" y="1102" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="27" font-weight="700" font-style="normal" fill="#202635">+</text>
+<text x="1459" y="1104" text-anchor="start" dominant-baseline="middle" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" font-style="normal" fill="#F4F6FB">Element-wise addition</text>
+</svg>
