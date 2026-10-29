@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include <wx/wx.h>
-#include <wx/listbox.h>
+#include <wx/treectrl.h>
 
 #include "DrawBoard.h"
 #include "ComponentLibrary.h"
@@ -12,10 +12,8 @@ public:
     cMain();
     ~cMain();
 
-    wxListBox* m_list1 = nullptr;
+    wxTreeCtrl* m_componentTree = nullptr;
     DrawBoard* drawborad = nullptr;
-
-    void OnLibraryItemDoubleClick(wxCommandEvent& evt);
 
 private:
     wxPanel* m_leftPanel = nullptr;
@@ -24,6 +22,7 @@ private:
     void CreateMenuBar();
     void CreateAppToolBar();
     void CreateLeftPanel();
+    void OnLibraryItemActivated(wxTreeEvent& evt);
 
     // 左栏元件库 -> 画布放置模式
     void PlaceGate(LibraryComponentType type);

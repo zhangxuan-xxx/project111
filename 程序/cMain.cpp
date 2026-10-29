@@ -2,10 +2,25 @@
 
 #include <wx/listctrl.h>
 #include <wx/statline.h>
+#include <wx/treectrl.h>
 
 #include "DrawBoard.h"
 #include "ComponentLibrary.h"
 #include "IconFactory.h"
+
+namespace
+{
+    class ComponentTreeItemData : public wxTreeItemData
+    {
+    public:
+        explicit ComponentTreeItemData(LibraryComponentType componentType)
+            : type(componentType)
+        {
+        }
+
+        LibraryComponentType type;
+    };
+}
 
 // ============================================================
 // 把 GateType 翻译成中文名称（属性对话框用）
@@ -384,25 +399,50 @@ void cMain::CreateLeftPanel()
 
     sizer->Add(libraryTitle, 0, wxLEFT | wxRIGHT | wxTOP, 14);
 
-    m_list1 = new wxListBox(
+    m_componentTree = new wxTreeCtrl(//创建树控件
         m_leftPanel,
         wxID_ANY,
         wxDefaultPosition,
-        wxDefaultSize);
+        wxDefaultSize,
+        wxTR_DEFAULT_STYLE | wxTR_HAS_BUTTONS);
+
+    const wxTreeItemId root = m_componentTree->AddRoot(wxT("元件库"));//根节点
+    const wxTreeItemId gates =
+        m_componentTree->AppendItem(root, wxT("逻辑门"));//分类节点
 
     const auto& components = ComponentLibrary::GetComponents();
 
     for (const auto& component : components)
     {
-        m_list1->Append(component.name);
+        GateType gateType = AND;
+        switch (component.type)//挨个加入
+        {
+        case LibraryComponentType::AndGate:  gateType = AND; break;
+        case LibraryComponentType::OrGate:   gateType = OR; break;
+        case LibraryComponentType::NotGate:  gateType = NOT; break;
+        case LibraryComponentType::NandGate: gateType = NAND_GATE; break;
+        case LibraryComponentType::XorGate:  gateType = XOR_GATE; break;
+        case LibraryComponentType::NorGate:  gateType = NOR_GATE; break;
+        case LibraryComponentType::XnorGate: gateType = XNOR_GATE; break;
+        }
+
+        m_componentTree->AppendItem(
+            gates,
+            GateTypeName(gateType),
+            -1,
+            -1,
+            new ComponentTreeItemData(component.type));
     }
 
-    m_list1->Bind(
-        wxEVT_LISTBOX_DCLICK,
-        &cMain::OnLibraryItemDoubleClick,
+    m_componentTree->Expand(root);//根节点和分类节点默认展开
+    m_componentTree->Expand(gates);
+
+    m_componentTree->Bind(
+        wxEVT_TREE_ITEM_ACTIVATED,
+        &cMain::OnLibraryItemActivated,
         this);
 
-    sizer->Add(m_list1, 1, wxEXPAND | wxALL, 12);
+    sizer->Add(m_componentTree, 1, wxEXPAND | wxALL, 12);
 
     wxStaticText* hint = new wxStaticText(
         m_leftPanel,
@@ -826,7 +866,7 @@ void cMain::OnSelectTool(wxCommandEvent&)
 // ============================================================
 // 放置逻辑门（带快捷键 A / O / N / D / X）
 // ============================================================
-void cMain::OnPlaceComponent(wxCommandEvent& evt)
+void cMain::OnPlaceComponent(wxCommandEvent& evt)//放置元件
 {
     switch (evt.GetId())
     {
@@ -934,28 +974,21 @@ void cMain::PlaceGate(LibraryComponentType type)
 // ============================================================
 // 双击元件库
 // ============================================================
-void cMain::OnLibraryItemDoubleClick(wxCommandEvent&)
+void cMain::OnLibraryItemActivated(wxTreeEvent& evt)
 {
-    if (m_list1 == nullptr)
+    if (m_componentTree == nullptr)
     {
         return;
     }
 
-    const int selection = m_list1->GetSelection();
-
-    if (selection == wxNOT_FOUND)
+    auto* itemData = dynamic_cast<ComponentTreeItemData*>(
+        m_componentTree->GetItemData(evt.GetItem()));
+    if (itemData == nullptr)
     {
         return;
     }
 
-    const auto& components = ComponentLibrary::GetComponents();
-
-    if (static_cast<size_t>(selection) >= components.size())
-    {
-        return;
-    }
-
-    PlaceGate(components[selection].type);
+    PlaceGate(itemData->type);
 }
 
 // ============================================================
