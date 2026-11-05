@@ -73,7 +73,9 @@ enum GateType
     NAND_GATE,
     XOR_GATE,
     NOR_GATE,
-    XNOR_GATE
+    XNOR_GATE,
+    INPUT_SWITCH,
+    OUTPUT_INDICATOR
 };
 
 // ============================================================
@@ -93,6 +95,8 @@ public:
 
     bool scaling = false;
     bool moving = false;
+    bool logicValue = false;
+    bool logicValid = false;
 
     virtual ~Component() = default;
 };
@@ -162,6 +166,66 @@ public:
 
     // 子类负责绘制自身
     virtual void drawSelf(wxMemoryDC& memDC) const = 0;
+};
+
+// 输入开关与输出指示灯沿用 Gate 的端口/画布接口，方便接入现有连线系统。
+class InputSwitch : public Gate
+{
+public:
+    explicit InputSwitch(wxPoint center) : Gate(center)
+    {
+        type = INPUT_SWITCH;
+        scale = 1.0;
+        logicValid = true;
+    }
+
+    int GetInputCount() const override { return 0; }
+    wxPoint GetOutputPort() const override
+    {
+        return wxPoint(center.x + 40, center.y);
+    }
+
+    void drawSelf(wxMemoryDC& dc) const override
+    {
+        dc.SetPen(wxPen(wxColour(35, 75, 110), 2));
+        dc.SetBrush(logicValue ? wxBrush(wxColour(95, 205, 120))
+                               : wxBrush(wxColour(220, 225, 230)));
+        dc.DrawRoundedRectangle(center.x - 28, center.y - 20, 56, 40, 6);
+        dc.SetTextForeground(wxColour(25, 35, 45));
+        dc.DrawText(logicValue ? wxT("1") : wxT("0"), center.x - 5, center.y - 9);
+        dc.DrawLine(center.x + 28, center.y, center.x + 40, center.y);
+    }
+};
+
+class OutputIndicator : public Gate
+{
+public:
+    explicit OutputIndicator(wxPoint center) : Gate(center)
+    {
+        type = OUTPUT_INDICATOR;
+        scale = 1.0;
+    }
+
+    int GetInputCount() const override { return 1; }
+    wxPoint GetInputPort(int) const override
+    {
+        return wxPoint(center.x - 40, center.y);
+    }
+    wxPoint GetOutputPort() const override { return center; }
+
+    void drawSelf(wxMemoryDC& dc) const override
+    {
+        dc.SetPen(wxPen(wxColour(45, 55, 70), 2));
+        dc.SetBrush(logicValid
+            ? (logicValue ? wxBrush(wxColour(70, 205, 115))
+                          : wxBrush(wxColour(190, 195, 200)))
+            : wxBrush(wxColour(245, 195, 90)));
+        dc.DrawCircle(center.x, center.y, 18);
+        dc.SetTextForeground(wxColour(20, 30, 40));
+        dc.DrawText(logicValid ? (logicValue ? wxT("1") : wxT("0"))
+                               : wxT("?"), center.x - 5, center.y - 9);
+        dc.DrawLine(center.x - 40, center.y, center.x - 18, center.y);
+    }
 };
 
 // ============================================================

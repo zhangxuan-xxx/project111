@@ -23,6 +23,8 @@ namespace
         case XOR_GATE:  return "XOR";
         case NOR_GATE:  return "NOR";
         case XNOR_GATE: return "XNOR";
+        case INPUT_SWITCH: return "INPUT";
+        case OUTPUT_INDICATOR: return "OUTPUT";
         default:        return "AND";
         }
     }
@@ -53,6 +55,8 @@ namespace
         if (text == "XOR")                         { type = XOR_GATE;  return true; }
         if (text == "NOR" || text == "NORGATE")   { type = NOR_GATE;  return true; }
         if (text == "XNOR" || text == "XNORGATE") { type = XNOR_GATE; return true; }
+        if (text == "INPUT" || text == "INPUTSWITCH") { type = INPUT_SWITCH; return true; }
+        if (text == "OUTPUT" || text == "OUTPUTINDICATOR") { type = OUTPUT_INDICATOR; return true; }
 
         return false;
     }
@@ -139,6 +143,8 @@ Gate* SceneIO::CreateGate(GateType type, const wxPoint& center)
     case XOR_GATE:  return new XORGate(center);
     case NOR_GATE:  return new NORGate(center);
     case XNOR_GATE: return new XNORGate(center);
+    case INPUT_SWITCH: return new InputSwitch(center);
+    case OUTPUT_INDICATOR: return new OutputIndicator(center);
     default:        return new ANDGate(center);
     }
 }
@@ -183,6 +189,7 @@ bool SceneIO::Save(const wxString& path,
         item.Set("y", Json(gate->center.y));
         item.Set("label", Json(FromWx(gate->label)));
         item.Set("scale", Json(gate->scale));
+        item.Set("logicValue", Json(gate->logicValue));
 
         gateArray.Push(std::move(item));
     }
@@ -390,6 +397,8 @@ bool SceneIO::Load(const wxString& path, SceneFileData& data,
 
         const double scale = item["scale"].AsDouble(1.0);
         gate->scale = wxMin(wxMax(scale, 0.2), 5.0);
+        gate->logicValue = item["logicValue"].AsBool(false);
+        gate->logicValid = gate->type == INPUT_SWITCH;
 
         result.gates.push_back(gate);
     }

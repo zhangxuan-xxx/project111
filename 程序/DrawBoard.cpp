@@ -6,6 +6,8 @@
 
 #include <climits>
 #include <cmath>
+#include <functional>
+#include <unordered_map>
 #include <utility>
 
 wxDEFINE_EVENT(EVT_DRAWBOARD_TOOL_CHANGED, wxCommandEvent);
@@ -385,6 +387,8 @@ void DrawBoard::ClearAll()
     isDrawingXorGate = false;
     isDrawingNorGate = false;
     isDrawingXnorGate = false;
+    isDrawingInputSwitch = false;
+    isDrawingOutputIndicator = false;
 
     SetCurrentTool(TOOL_SELECT);
 
@@ -431,11 +435,15 @@ void DrawBoard::SetScene(std::vector<Gate*> gates,
     isDrawingXorGate = false;
     isDrawingNorGate = false;
     isDrawingXnorGate = false;
+    isDrawingInputSwitch = false;
+    isDrawingOutputIndicator = false;
 
     SetCurrentTool(TOOL_SELECT);
 
     // 让连接在元件上的线重新贴合端口坐标
     UpdateWirePositions();
+    wxString simulationError;
+    RecalculateCircuit(simulationError);
 
     Refresh(false);
 }
@@ -448,6 +456,139 @@ void DrawBoard::MarkModified()
     wxCommandEvent event(EVT_DRAWBOARD_MODIFIED);
     event.SetEventObject(this);
     wxPostEvent(GetParent(), event);
+}
+
+// 依据端口连线递归求值。悬空输入和反馈环路均标记为无效。
+bool DrawBoard::RecalculateCircuit(wxString& error)
+{
+    std::unordered_map<int, int> visit;
+    std::unordered_map<int, bool> values;
+    bool allValid = true;
+
+    for (Gate* gate : Gates)
+    {
+        if (gate == nullptr) continue;
+        gate->logicValid = (gate->type == INPUT_SWITCH);
+    }
+
+    std::function<bool(Gate*, bool&)> evaluate =
+        [&](Gate* gate, bool& result) -> bool
+    {
+        if (gate == nullptr) return false;
+        if (gate->type == INPUT_SWITCH)
+        {
+            result = gate->logicValue;
+            gate->logicValid = true;
+            return true;
+        }
+
+        if (visit[gate->id] == 1)
+        {
+            gate->logicValid = false;
+            error = wxT("检测到反馈环路，当前组合电路无法求值。");
+            return false;
+        }
+        if (visit[gate->id] == 2)
+        {
+            result = values[gate->id];
+            return true;
+        }
+
+        visit[gate->id] = 1;
+        std::vector<bool> inputs;
+        for (int port = 0; port < gate->GetInputCount(); ++port)
+        {
+            const Wire* driver = nullptr;
+            for (const Wire& wire : m_wires)
+            {
+                if (wire.endComponentId == gate->id &&
+                    wire.endPortIndex == port)
+                {
+                    if (driver != nullptr)
+                    {
+                        error = wxT("同一输入端存在多个驱动来源。");
+                        gate->logicValid = false;
+                        return false;
+                    }
+                    driver = &wire;
+                }
+            }
+
+            if (driver == nullptr || driver->startComponentId < 0)
+            {
+                error = wxT("电路存在未连接的输入端。");
+                gate->logicValid = false;
+                return false;
+            }
+
+            Gate* source = FindGateById(driver->startComponentId);
+            if (source == nullptr || source->type == OUTPUT_INDICATOR)
+            {
+                error = wxT("连线起点不是有效的输出元件。");
+                gate->logicValid = false;
+                return false;
+            }
+
+            bool inputValue = false;
+            if (!evaluate(source, inputValue))
+            {
+                gate->logicValid = false;
+                return false;
+            }
+            inputs.push_back(inputValue);
+        }
+
+        switch (gate->type)
+        {
+        case OUTPUT_INDICATOR:
+            result = inputs.size() == 1 ? inputs[0] : false;
+            break;
+        case NOT:
+            result = !inputs[0];
+            break;
+        case AND:
+            result = inputs[0] && inputs[1];
+            break;
+        case OR:
+            result = inputs[0] || inputs[1];
+            break;
+        case NAND_GATE:
+            result = !(inputs[0] && inputs[1]);
+            break;
+        case XOR_GATE:
+            result = inputs[0] != inputs[1];
+            break;
+        case NOR_GATE:
+            result = !(inputs[0] || inputs[1]);
+            break;
+        case XNOR_GATE:
+            result = inputs[0] == inputs[1];
+            break;
+        default:
+            gate->logicValid = false;
+            return false;
+        }
+
+        gate->logicValue = result;
+        gate->logicValid = true;
+        values[gate->id] = result;
+        visit[gate->id] = 2;
+        return true;
+    };
+
+    for (Gate* gate : Gates)
+    {
+        if (gate == nullptr) continue;
+        bool value = false;
+        if (!evaluate(gate, value)) allValid = false;
+    }
+
+    if (!allValid && error.empty())
+    {
+        error = wxT("电路尚未连接完整，请检查输入端。");
+    }
+    Refresh(false);
+    return allValid;
 }
 
 // =====================================================
@@ -620,6 +761,8 @@ void DrawBoard::CancelCurrentAction()
     isDrawingXorGate = false;
     isDrawingNorGate = false;
     isDrawingXnorGate = false;
+    isDrawingInputSwitch = false;
+    isDrawingOutputIndicator = false;
 
     SetCurrentTool(TOOL_SELECT);
     Refresh(false);
@@ -742,6 +885,25 @@ void DrawBoard::OnMouseDown(wxMouseEvent& event)//实际点击时放置元件
     // 放置位置吸附到网格（按住 Alt 可临时关闭）
     const wxPoint placePos =
         event.AltDown() ? m_mousePos : SnapPoint(m_mousePos);
+
+    if (isDrawingInputSwitch || isDrawingOutputIndicator)
+    {
+        Gate* ioGate = isDrawingInputSwitch
+            ? static_cast<Gate*>(new InputSwitch(placePos))
+            : static_cast<Gate*>(new OutputIndicator(placePos));
+        ioGate->id = m_nextGateId++;
+        Gates.push_back(ioGate);
+        m_selectedGate = ioGate;
+        m_selectedText = -1;
+        m_draggingGate = false;
+        MarkModified();
+        isDrawingInputSwitch = false;
+        isDrawingOutputIndicator = false;
+        SetCurrentTool(TOOL_SELECT);
+        Refresh(false);
+        NotifyToolChanged(0);
+        return;
+    }
 
     if (isDrawingAndGate)
     {
@@ -913,6 +1075,23 @@ void DrawBoard::OnMouseUp(wxMouseEvent& event)
     if (m_draggingGate)
     {
         m_draggingGate = false;
+
+        if (m_selectedGate != nullptr &&
+            m_selectedGate->center == m_dragStartCenter &&
+            m_selectedGate->type == INPUT_SWITCH)
+        {
+            m_selectedGate->logicValue = !m_selectedGate->logicValue;
+            wxString error;
+            const bool valid = RecalculateCircuit(error);
+            MarkModified();
+            if (wxFrame* frame = wxDynamicCast(GetParent(), wxFrame))
+            {
+                frame->SetStatusText(valid
+                    ? wxString::Format(wxT("输入开关 #%d = %d，仿真已更新"),
+                        m_selectedGate->id, m_selectedGate->logicValue ? 1 : 0)
+                    : wxString::Format(wxT("输入开关已切换；%s"), error), 0);
+            }
+        }
 
         if (m_selectedGate != nullptr &&
             m_selectedGate->center != m_dragStartCenter)
@@ -1213,6 +1392,8 @@ void DrawBoard::OnRightClick(wxMouseEvent& event)
         {
             m_wires.erase(m_wires.begin() + m_selectedWire);
             MarkModified();
+            wxString simulationError;
+            RecalculateCircuit(simulationError);
         }
         m_selectedWire = -1;
         Refresh(false);
@@ -1257,6 +1438,8 @@ void DrawBoard::DeleteSelectedGate()
         delete* it;
         Gates.erase(it);
         MarkModified();
+        wxString simulationError;
+        RecalculateCircuit(simulationError);
     }
 
     m_selectedGate = nullptr;
@@ -1345,6 +1528,11 @@ bool DrawBoard::FindOutputPortAt(
             continue;
         }
 
+        if (current->type == OUTPUT_INDICATOR)
+        {
+            continue;
+        }
+
         wxPoint port = current->GetOutputPort();
 
         int dx = pos.x - port.x;
@@ -1370,6 +1558,14 @@ void DrawBoard::StartWire(const wxPoint& pos)
 {
 
     m_wirePressPos = pos;
+    Gate* hitGate = FindGateAt(pos);
+    if (hitGate != nullptr && hitGate->type == OUTPUT_INDICATOR)
+    {
+        wxMessageBox(wxT("输出指示器只有输入端，不能从这里开始连线。"),
+            wxT("无法连接"), wxOK | wxICON_WARNING, this);
+        return;
+    }
+
     Gate* startGate = nullptr;
 
     if (FindOutputPortAt(pos, startGate))
@@ -1416,9 +1612,31 @@ void DrawBoard::CompleteWire(const wxPoint& pos)
         endComponentId = endGate->id;
         endPoint = endGate->GetInputPort(inputIndex);
 
+        for (const Wire& existing : m_wires)
+        {
+            if (existing.endComponentId == endComponentId &&
+                existing.endPortIndex == inputIndex)
+            {
+                wxMessageBox(wxT("这个输入端已经有连线，请先删除原连线。"),
+                    wxT("无法连接"), wxOK | wxICON_WARNING, this);
+                CancelWire();
+                return;
+            }
+        }
+
     }
     else
     {
+        Gate* clickedGate = FindGateAt(pos);
+        if (clickedGate != nullptr &&
+            (clickedGate->type == OUTPUT_INDICATOR ||
+             clickedGate->GetInputCount() == 0))
+        {
+            wxMessageBox(wxT("该元件没有可连接的输入端，不能作为连线终点。"),
+                wxT("无法连接"), wxOK | wxICON_WARNING, this);
+            CancelWire();
+            return;
+        }
         // 落笔在空白处：生成一段两端悬空的自由连线
         endPoint = SnapPoint(pos);
     }
@@ -1444,6 +1662,15 @@ void DrawBoard::CompleteWire(const wxPoint& pos)
 
     m_wires.push_back(wire);
     MarkModified();
+
+    wxString simulationError;
+    if (!RecalculateCircuit(simulationError))
+    {
+        if (wxFrame* frame = wxDynamicCast(GetParent(), wxFrame))
+        {
+            frame->SetStatusText(wxT("连线已建立；") + simulationError, 0);
+        }
+    }
 
     CancelWire();
 }

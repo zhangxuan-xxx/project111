@@ -66,6 +66,8 @@ public:
     bool isDrawingXorGate = false;
     bool isDrawingNorGate = false;
     bool isDrawingXnorGate = false;
+    bool isDrawingInputSwitch = false;
+    bool isDrawingOutputIndicator = false;
 
     // 供主窗口读取当前选中对象（属性对话框用）
     Gate* GetSelectedGate() const
@@ -138,6 +140,9 @@ public:
 
     // 标记图纸已修改（外部改动时调用）
     void MarkModified();
+
+    // 根据当前开关状态和连线关系重新计算组合逻辑。
+    bool RecalculateCircuit(wxString& error);
 
 private:
     // 当前工具

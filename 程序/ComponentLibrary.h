@@ -15,7 +15,9 @@ enum class LibraryComponentType
     NandGate,
     XorGate,
     NorGate,
-    XnorGate
+    XnorGate,
+    InputSwitch,
+    OutputIndicator
 };
 
 // ============================================================

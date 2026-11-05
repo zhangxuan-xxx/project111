@@ -39,6 +39,8 @@ static wxString GateTypeName(GateType type)
     case XOR_GATE:  return wxT("异或门 (XOR)");
     case NOR_GATE:  return wxT("或非门 (NOR)");
     case XNOR_GATE: return wxT("同或门 (XNOR)");
+    case INPUT_SWITCH: return wxT("输入开关");
+    case OUTPUT_INDICATOR: return wxT("输出指示器");
     default:        return wxT("逻辑门");
     }
 }
@@ -458,6 +460,8 @@ void cMain::CreateLeftPanel()
         case LibraryComponentType::XorGate:  gateType = XOR_GATE; break;
         case LibraryComponentType::NorGate:  gateType = NOR_GATE; break;
         case LibraryComponentType::XnorGate: gateType = XNOR_GATE; break;
+        case LibraryComponentType::InputSwitch: gateType = INPUT_SWITCH; break;
+        case LibraryComponentType::OutputIndicator: gateType = OUTPUT_INDICATOR; break;
         }
 
         m_componentTree->AppendItem(
@@ -901,6 +905,10 @@ void cMain::OnSelectTool(wxCommandEvent&)
     drawborad->isDrawingXorGate = false;
     drawborad->isDrawingNorGate = false;
     drawborad->isDrawingXnorGate = false;
+    drawborad->isDrawingInputSwitch = false;
+    drawborad->isDrawingOutputIndicator = false;
+    drawborad->isDrawingInputSwitch = false;
+    drawborad->isDrawingOutputIndicator = false;
 
     drawborad->SetCurrentTool(TOOL_SELECT);
     drawborad->SetFocus();
@@ -967,6 +975,8 @@ void cMain::PlaceGate(LibraryComponentType type)
     drawborad->isDrawingXorGate = false;
     drawborad->isDrawingNorGate = false;
     drawborad->isDrawingXnorGate = false;
+    drawborad->isDrawingInputSwitch = false;
+    drawborad->isDrawingOutputIndicator = false;
 
     wxString toolName;
 
@@ -1005,6 +1015,16 @@ void cMain::PlaceGate(LibraryComponentType type)
     case LibraryComponentType::XnorGate:
         drawborad->isDrawingXnorGate = true;
         toolName = wxT("放置 XNOR");
+        break;
+
+    case LibraryComponentType::InputSwitch:
+        drawborad->isDrawingInputSwitch = true;
+        toolName = wxT("放置输入开关");
+        break;
+
+    case LibraryComponentType::OutputIndicator:
+        drawborad->isDrawingOutputIndicator = true;
+        toolName = wxT("放置输出指示器");
         break;
 
     default:
@@ -1057,6 +1077,8 @@ void cMain::OnPlaceText(wxCommandEvent&)
     drawborad->isDrawingXorGate = false;
     drawborad->isDrawingNorGate = false;
     drawborad->isDrawingXnorGate = false;
+    drawborad->isDrawingInputSwitch = false;
+    drawborad->isDrawingOutputIndicator = false;
 
     drawborad->SetCurrentTool(TOOL_TEXT);
     drawborad->SetFocus();

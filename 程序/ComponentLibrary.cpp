@@ -13,7 +13,9 @@ const std::vector<ComponentInfo>& ComponentLibrary::GetComponents()
         { LibraryComponentType::NandGate, "NAND Gate" },
         { LibraryComponentType::XorGate,  "XOR Gate" },
         { LibraryComponentType::NorGate,  "NOR Gate" },
-        { LibraryComponentType::XnorGate, "XNOR Gate" }
+        { LibraryComponentType::XnorGate, "XNOR Gate" },
+        { LibraryComponentType::InputSwitch, "输入开关 (INPUT)" },
+        { LibraryComponentType::OutputIndicator, "输出指示器 (OUTPUT)" }
     };
 
     return components;
@@ -49,6 +51,12 @@ Gate* ComponentLibrary::CreateGate(
 
     case LibraryComponentType::XnorGate:
         return new XNORGate(position);
+
+    case LibraryComponentType::InputSwitch:
+        return new InputSwitch(position);
+
+    case LibraryComponentType::OutputIndicator:
+        return new OutputIndicator(position);
 
     default:
         return nullptr;

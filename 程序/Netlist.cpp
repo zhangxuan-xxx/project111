@@ -267,8 +267,15 @@ namespace
             {
                 const Gate* gate = m_gates[i];
 
-                const wxPoint out = gate->GetOutputPort();
-                m_outNode[i] = addNode(out.x, out.y);
+                if (gate->type == OUTPUT_INDICATOR)
+                {
+                    m_outNode[i] = -1;
+                }
+                else
+                {
+                    const wxPoint out = gate->GetOutputPort();
+                    m_outNode[i] = addNode(out.x, out.y);
+                }
 
                 const int inputs = gate->GetInputCount();
                 m_inNodes[i].resize(static_cast<std::size_t>(inputs), -1);
@@ -371,7 +378,7 @@ namespace
 
             std::map<int, int> driverCount;
 
-            auto addPort = [&nets, &driverCount](int node, int gate, int port,
+            auto addPort = [this, &nets, &driverCount](int node, int gate, int port,
                                                  bool output)
             {
                 const int root = node;
@@ -379,24 +386,40 @@ namespace
 
                 if (output)
                 {
-                    ++driverCount[root];
-
-                    if (net.driverGate < 0)
+                    if (m_gates[gate]->type == INPUT_SWITCH)
                     {
-                        net.driverGate = gate;
+                        net.primaryInput = true;
+                    }
+                    else
+                    {
+                        ++driverCount[root];
+                        if (net.driverGate < 0)
+                        {
+                            net.driverGate = gate;
+                        }
                     }
                 }
                 else
                 {
-                    net.sinks.emplace_back(gate, port);
+                    if (m_gates[gate]->type == OUTPUT_INDICATOR)
+                    {
+                        net.primaryOutput = true;
+                    }
+                    else
+                    {
+                        net.sinks.emplace_back(gate, port);
+                    }
                 }
             };
 
             // 端口节点先求根再挂到对应网络
             for (std::size_t i = 0; i < m_gates.size(); ++i)
             {
-                const int outRoot = find(m_outNode[i]);
-                addPort(outRoot, static_cast<int>(i), -1, true);
+                if (m_outNode[i] >= 0)
+                {
+                    const int outRoot = find(m_outNode[i]);
+                    addPort(outRoot, static_cast<int>(i), -1, true);
+                }
 
                 for (std::size_t k = 0; k < m_inNodes[i].size(); ++k)
                 {
@@ -436,9 +459,10 @@ namespace
                 }
 
                 Net copy = net;
-                copy.primaryInput = (driverCount[root] == 0);
-                copy.primaryOutput = (driverCount[root] > 0 &&
-                                      copy.sinks.empty());
+                copy.primaryInput = copy.primaryInput ||
+                    (driverCount[root] == 0 && !copy.primaryOutput);
+                copy.primaryOutput = copy.primaryOutput ||
+                    (driverCount[root] > 0 && copy.sinks.empty());
 
                 m_rootToIndex[root] = static_cast<int>(m_nets.size());
                 m_nets.push_back(std::move(copy));
@@ -458,7 +482,8 @@ namespace
 
             for (std::size_t i = 0; i < m_gates.size(); ++i)
             {
-                m_outNet[i] = m_rootToIndex[find(m_outNode[i])];
+                m_outNet[i] = m_outNode[i] >= 0
+                    ? m_rootToIndex[find(m_outNode[i])] : -1;
 
                 m_inNets[i].resize(m_inNodes[i].size(), -1);
 
@@ -698,6 +723,11 @@ bool Netlist::ExportVerilog(const wxString& path,
     {
         const Gate& gate = builder.GateAt(i);
 
+        if (gate.type == INPUT_SWITCH || gate.type == OUTPUT_INDICATOR)
+        {
+            continue;
+        }
+
         text += "    ";
         text += PrimitiveName(gate.type);
         text += " ";
@@ -829,7 +859,8 @@ bool Netlist::ExportBlif(const wxString& path,
         const Gate& gate = builder.GateAt(i);
         const int outNet = builder.OutputNet(i);
 
-        if (outNet < 0)
+        if (outNet < 0 || gate.type == INPUT_SWITCH ||
+            gate.type == OUTPUT_INDICATOR)
         {
             continue;
         }
