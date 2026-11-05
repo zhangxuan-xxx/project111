@@ -1,0 +1,26 @@
+{
+  "format": "dgate",
+  "version": 1,
+  "app": "DrawGate",
+  "canvas": {
+    "gridSize": 20,
+    "gridVisible": true,
+    "snapToGrid": true
+  },
+  "gates": [
+    { "id": 1, "type": "AND", "x": 60, "y": 320, "label": "U1", "scale": 1 },
+    { "id": 2, "type": "XOR", "x": 220, "y": 330, "label": "U2", "scale": 1 },
+    { "id": 3, "type": "NOT", "x": 380, "y": 330, "label": "U3", "scale": 1 },
+    { "id": 4, "type": "OR", "x": 540, "y": 340, "label": "U4", "scale": 1 },
+    { "id": 5, "type": "XNOR", "x": 700, "y": 350, "label": "U5", "scale": 1 }
+  ],
+  "wires": [
+    { "x1": 120, "y1": 320, "x2": 180, "y2": 320, "fromGate": 1, "toGate": 2, "fromPort": -1, "toPort": 0 },
+    { "x1": 280, "y1": 330, "x2": 340, "y2": 330, "fromGate": 2, "toGate": 3, "fromPort": -1, "toPort": 0 },
+    { "x1": 440, "y1": 330, "x2": 500, "y2": 330, "fromGate": 3, "toGate": 4, "fromPort": -1, "toPort": 0 },
+    { "x1": 600, "y1": 340, "x2": 660, "y2": 340, "fromGate": 4, "toGate": 5, "fromPort": -1, "toPort": 0 }
+  ],
+  "texts": [
+    { "x": 40, "y": 200, "text": "示例：逻辑门链（AND → XOR → NOT → OR → XNOR）" }
+  ]
+}

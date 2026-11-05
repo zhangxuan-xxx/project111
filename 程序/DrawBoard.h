@@ -1,4 +1,4 @@
-﻿
+
 #pragma once
 
 #include <wx/wx.h>
@@ -12,6 +12,9 @@
 
 // 工具被取消 / 切换时通知主窗口（用于刷新状态栏）
 wxDECLARE_EVENT(EVT_DRAWBOARD_TOOL_CHANGED, wxCommandEvent);
+
+// 图纸内容被修改时通知主窗口（用于标题栏的 * 与关闭提示）
+wxDECLARE_EVENT(EVT_DRAWBOARD_MODIFIED, wxCommandEvent);
 
 class DrawBoard : public wxPanel
 {
@@ -102,6 +105,40 @@ public:
 
         DeleteSelectedGate();
     }
+
+    // ========================================================
+    // 文件读写支持
+    // ========================================================
+    const std::vector<Gate*>& GetGates() const
+    {
+        return Gates;
+    }
+
+    const std::vector<Wire>& GetWires() const
+    {
+        return m_wires;
+    }
+
+    int GetNextGateId() const
+    {
+        return m_nextGateId;
+    }
+
+    // 用读入的数据替换当前画布（接管 gates 的所有权）
+    void SetScene(std::vector<Gate*> gates,
+                  std::vector<Wire> wires,
+                  const std::vector<BoardText>& texts,
+                  int nextGateId,
+                  int gridSize,
+                  bool gridVisible,
+                  bool snapToGrid);
+
+    // 把当前画布导出为 PNG 图片
+    bool ExportPng(const wxString& path, wxString& error);
+
+    // 标记图纸已修改（外部改动时调用）
+    void MarkModified();
+
 private:
     // 当前工具
     ToolType m_currentTool = TOOL_SELECT;
@@ -130,6 +167,9 @@ private:
     // 鼠标按下时，鼠标相对元件中心的偏移量
     wxPoint m_dragOffset;
 
+    // 拖动开始时的元件中心（用于判断这次拖动是否真的移动过）
+    wxPoint m_dragStartCenter;
+
     // 网格与吸附
     bool m_gridVisible = true;
     bool m_snapToGrid = true;
@@ -144,6 +184,12 @@ private:
     // 绘图
     void OnPaint(wxPaintEvent& event);
     void drawGrid(wxGraphicsContext* gc);
+
+    // 绘制场景；exportMode 为 true 时不画网格、十字线、选中框和临时连线
+    void RenderScene(wxMemoryDC& dc, const wxSize& size, bool exportMode);
+
+    // 计算所有图形内容的包围盒（画布坐标）
+    wxRect ComputeContentBounds() const;
 
     // 鼠标事件
     void OnMouseMove(wxMouseEvent& event);

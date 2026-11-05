@@ -4,9 +4,12 @@
 
 #include <wx/textdlg.h>
 
+#include <climits>
 #include <cmath>
+#include <utility>
 
 wxDEFINE_EVENT(EVT_DRAWBOARD_TOOL_CHANGED, wxCommandEvent);
+wxDEFINE_EVENT(EVT_DRAWBOARD_MODIFIED, wxCommandEvent);
 
 // =====================================================
 // 构造函数
@@ -89,53 +92,45 @@ DrawBoard::~DrawBoard()
 // =====================================================
 //4. 绘图
 // =====================================================
-void DrawBoard::OnPaint(wxPaintEvent& event)
+void DrawBoard::RenderScene(wxMemoryDC& memDC, const wxSize& size, bool exportMode)
 {
-    wxAutoBufferedPaintDC dc(this);//创建窗口绘图设备
-
-    dc.SetBackground(*wxWHITE_BRUSH);//清理成白色背景
-    dc.Clear();
-
-    wxSize size = GetClientSize();
-
-    if (size.x <= 0 || size.y <= 0)
+    // 绘制网格与鼠标十字线（导出图片时不画）
+    if (!exportMode)
     {
-        return;
+        wxGraphicsContext* gc = wxGraphicsContext::Create(memDC);
+
+        if (gc != nullptr)
+        {
+            drawGrid(gc);
+
+            gc->SetPen(wxPen(wxColour(0, 0, 0), 1));
+
+            gc->StrokeLine(
+                m_mousePos.x, 0,
+                m_mousePos.x, size.y);
+
+            gc->StrokeLine(
+                0, m_mousePos.y,
+                size.x, m_mousePos.y);
+
+            delete gc;
+        }
     }
 
-    wxBitmap bufferBitmap(size);
-    wxMemoryDC memDC;
-
-    memDC.SelectObject(bufferBitmap);
-    memDC.SetBackground(*wxWHITE_BRUSH);
-    memDC.Clear();
-
-    // 绘制网格
-    wxGraphicsContext* gc = wxGraphicsContext::Create(memDC);
-
-    if (gc != nullptr)
-    {
-        drawGrid(gc);
-
-        // 鼠标十字参考线
-        gc->SetPen(wxPen(wxColour(0, 0, 0), 1));
-
-        gc->StrokeLine(
-            m_mousePos.x, 0,
-            m_mousePos.x, size.y);
-
-        gc->StrokeLine(
-            0, m_mousePos.y,
-            size.x, m_mousePos.y);
-
-        delete gc;
-    }
-
-    // 绘制已有连线（右键选中的线用现有活动色高亮）
+    // 绘制已有连线（导出时不高亮选中线）
     for (int i = 0; i < static_cast<int>(m_wires.size()); ++i)
     {
-        m_wires[i].isActive = (i == m_selectedWire);
-        m_wires[i].Draw(memDC);
+        if (exportMode)
+        {
+            Wire copy = m_wires[i];
+            copy.isActive = false;
+            copy.Draw(memDC);
+        }
+        else
+        {
+            m_wires[i].isActive = (i == m_selectedWire);
+            m_wires[i].Draw(memDC);
+        }
     }
 
     // 绘制逻辑门
@@ -184,8 +179,8 @@ void DrawBoard::OnPaint(wxPaintEvent& event)
         memDC.DrawText(item.text, item.pos);
     }
 
-    // 选中文字的虚线框
-    if (m_selectedText >= 0 &&
+    // 选中文字的虚线框（导出时不画）
+    if (!exportMode && m_selectedText >= 0 &&
         m_selectedText < static_cast<int>(m_texts.size()))
     {
         const BoardText& item = m_texts[m_selectedText];
@@ -201,8 +196,8 @@ void DrawBoard::OnPaint(wxPaintEvent& event)
             extent.x + 6, extent.y + 6);
     }
 
-    // 绘制选中框
-    if (m_selectedGate != nullptr)
+    // 绘制选中框（导出时不画）
+    if (!exportMode && m_selectedGate != nullptr)
     {
         wxPoint c = m_selectedGate->center;
         double s = m_selectedGate->scale;
@@ -223,8 +218,8 @@ void DrawBoard::OnPaint(wxPaintEvent& event)
         memDC.DrawRectangle(selectionRect);
     }
 
-    // 绘制临时连线
-    if (m_wiring)
+    // 绘制临时连线（导出时不画）
+    if (!exportMode && m_wiring)
     {
         memDC.SetPen(wxPen(
             wxColour(255, 0, 0),
@@ -244,12 +239,35 @@ void DrawBoard::OnPaint(wxPaintEvent& event)
         memDC.DrawLine(p2, m_wireEndPos);
     }
 
-    // 将内存画布绘制到窗口
-    dc.Blit(
-        0, 0,
-        size.x, size.y,
-        &memDC,
-        0, 0);
+}
+
+// =====================================================
+// 窗口重绘：先把场景画到内存位图，再整体贴到窗口
+// =====================================================
+void DrawBoard::OnPaint(wxPaintEvent& event)
+{
+    wxAutoBufferedPaintDC dc(this);
+
+    dc.SetBackground(*wxWHITE_BRUSH);
+    dc.Clear();
+
+    const wxSize size = GetClientSize();
+
+    if (size.x <= 0 || size.y <= 0)
+    {
+        return;
+    }
+
+    wxBitmap bufferBitmap(size);
+    wxMemoryDC memDC;
+
+    memDC.SelectObject(bufferBitmap);
+    memDC.SetBackground(*wxWHITE_BRUSH);
+    memDC.Clear();
+
+    RenderScene(memDC, size, false);
+
+    dc.Blit(0, 0, size.x, size.y, &memDC, 0, 0);
 
     memDC.SelectObject(wxNullBitmap);
 }
@@ -302,6 +320,7 @@ void DrawBoard::drawGrid(wxGraphicsContext* gc)
 void DrawBoard::SetGridVisible(bool visible)
 {
     m_gridVisible = visible;
+    MarkModified();
     Refresh(false);
 }
 
@@ -313,12 +332,14 @@ void DrawBoard::SetGridSize(int size)
     }
 
     m_gridSize = size;
+    MarkModified();
     Refresh(false);
 }
 
 void DrawBoard::SetSnapToGrid(bool snap)
 {
     m_snapToGrid = snap;
+    MarkModified();
 }
 
 wxPoint DrawBoard::SnapPoint(const wxPoint& pos) const
@@ -370,6 +391,209 @@ void DrawBoard::ClearAll()
     Refresh(false);
 }
 
+// =====================================================
+// 用读入的数据替换画布（文件 -> 画布）
+// =====================================================
+void DrawBoard::SetScene(std::vector<Gate*> gates,
+                         std::vector<Wire> wires,
+                         const std::vector<BoardText>& texts,
+                         int nextGateId,
+                         int gridSize,
+                         bool gridVisible,
+                         bool snapToGrid)
+{
+    for (Gate* gate : Gates)
+    {
+        delete gate;
+    }
+
+    Gates = std::move(gates);
+    m_wires = std::move(wires);
+    m_texts = texts;
+
+    m_nextGateId = nextGateId > 0 ? nextGateId : 1;
+    m_gridSize = gridSize > 0 ? gridSize : 20;
+    m_gridVisible = gridVisible;
+    m_snapToGrid = snapToGrid;
+
+    m_selectedGate = nullptr;
+    m_selectedText = -1;
+    m_selectedWire = -1;
+    m_draggingGate = false;
+    m_wiring = false;
+    m_wireDragging = false;
+    m_wireStartComponentId = -1;
+
+    isDrawingAndGate = false;
+    isDrawingOrGate = false;
+    isDrawingNotGate = false;
+    isDrawingNandGate = false;
+    isDrawingXorGate = false;
+    isDrawingNorGate = false;
+    isDrawingXnorGate = false;
+
+    SetCurrentTool(TOOL_SELECT);
+
+    // 让连接在元件上的线重新贴合端口坐标
+    UpdateWirePositions();
+
+    Refresh(false);
+}
+
+// =====================================================
+// 通知主窗口：图纸内容已修改
+// =====================================================
+void DrawBoard::MarkModified()
+{
+    wxCommandEvent event(EVT_DRAWBOARD_MODIFIED);
+    event.SetEventObject(this);
+    wxPostEvent(GetParent(), event);
+}
+
+// =====================================================
+// 计算所有内容的包围盒（画布坐标）
+// =====================================================
+wxRect DrawBoard::ComputeContentBounds() const
+{
+    bool any = false;
+    int left = INT_MAX;
+    int top = INT_MAX;
+    int right = INT_MIN;
+    int bottom = INT_MIN;
+
+    auto include = [&](int x1, int y1, int x2, int y2)
+    {
+        any = true;
+        left = std::min(left, std::min(x1, x2));
+        top = std::min(top, std::min(y1, y2));
+        right = std::max(right, std::max(x1, x2));
+        bottom = std::max(bottom, std::max(y1, y2));
+    };
+
+    for (const Gate* gate : Gates)
+    {
+        if (gate == nullptr)
+        {
+            continue;
+        }
+
+        const double s = gate->scale;
+
+        include(
+            gate->center.x - static_cast<int>(45 * s),
+            gate->center.y - static_cast<int>(45 * s),
+            gate->center.x + static_cast<int>(65 * s),
+            gate->center.y + static_cast<int>(30 * s));
+    }
+
+    for (const Wire& wire : m_wires)
+    {
+        include(wire.start.x, wire.start.y, wire.end.x, wire.end.y);
+    }
+
+    if (!m_texts.empty())
+    {
+        wxBitmap probe(1, 1);
+        wxMemoryDC dc(probe);
+
+        dc.SetFont(wxFont(
+            11, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL,
+            wxFONTWEIGHT_NORMAL));
+
+        for (const BoardText& text : m_texts)
+        {
+            const wxSize extent = dc.GetTextExtent(text.text);
+
+            include(text.pos.x, text.pos.y,
+                    text.pos.x + extent.x, text.pos.y + extent.y);
+        }
+    }
+
+    if (!any)
+    {
+        return wxRect();
+    }
+
+    return wxRect(left, top, right - left + 1, bottom - top + 1);
+}
+
+// =====================================================
+// 导出当前画布为 PNG
+// =====================================================
+bool DrawBoard::ExportPng(const wxString& path, wxString& error)
+{
+    const wxRect bounds = ComputeContentBounds();
+
+    if (bounds.IsEmpty())
+    {
+        error = wxT("画布是空的，没有可导出的内容");
+        return false;
+    }
+
+    const int margin = 24;
+    const wxSize client = GetClientSize();
+
+    const int width = wxMax(client.x, bounds.GetRight() + 1 + margin);
+    const int height = wxMax(client.y, bounds.GetBottom() + 1 + margin);
+
+    if (width <= 0 || height <= 0)
+    {
+        error = wxT("导出尺寸非法");
+        return false;
+    }
+
+    wxBitmap bitmap(width, height, 24);
+
+    if (!bitmap.IsOk())
+    {
+        error = wxT("创建导出位图失败（尺寸过大？）");
+        return false;
+    }
+
+    {
+        wxMemoryDC dc(bitmap);
+
+        dc.SetBackground(*wxWHITE_BRUSH);
+        dc.Clear();
+
+        RenderScene(dc, wxSize(width, height), true);
+
+        dc.SelectObject(wxNullBitmap);
+    }
+
+    wxImage image = bitmap.ConvertToImage();
+
+    if (!image.IsOk())
+    {
+        error = wxT("位图转换失败");
+        return false;
+    }
+
+    // 裁掉内容周围的空白（保留 24px 边距）
+    const int cropLeft = wxMax(0, bounds.x - margin);
+    const int cropTop = wxMax(0, bounds.y - margin);
+    const int cropRight = wxMin(width, bounds.GetRight() + 1 + margin);
+    const int cropBottom = wxMin(height, bounds.GetBottom() + 1 + margin);
+
+    const wxRect crop(
+        cropLeft, cropTop,
+        cropRight - cropLeft, cropBottom - cropTop);
+
+    if (crop.width > 0 && crop.height > 0 &&
+        crop != wxRect(0, 0, width, height))
+    {
+        image = image.GetSubImage(crop);
+    }
+
+    if (!image.SaveFile(path, wxBITMAP_TYPE_PNG))
+    {
+        error = wxString::Format(wxT("保存 PNG 失败：%s"), path);
+        return false;
+    }
+
+    return true;
+}
+
 void DrawBoard::NotifyToolChanged(int reason)
 {
     wxCommandEvent event(EVT_DRAWBOARD_TOOL_CHANGED);
@@ -377,7 +601,6 @@ void DrawBoard::NotifyToolChanged(int reason)
     event.SetInt(reason);
     wxPostEvent(GetParent(), event);
 }
-
 void DrawBoard::CancelCurrentAction()
 {
     if (HasCapture())
@@ -553,6 +776,7 @@ void DrawBoard::OnMouseDown(wxMouseEvent& event)//实际点击时放置元件
     {
         newGate->id = m_nextGateId++;
         Gates.push_back(newGate);
+        MarkModified();
 
         m_selectedGate = newGate;
         m_draggingGate = false;
@@ -588,6 +812,7 @@ void DrawBoard::OnMouseDown(wxMouseEvent& event)//实际点击时放置元件
             item.text = value;
 
             m_texts.push_back(item);
+            MarkModified();
 
             m_selectedText = static_cast<int>(m_texts.size()) - 1;
             m_selectedGate = nullptr;
@@ -645,6 +870,7 @@ void DrawBoard::OnMouseDown(wxMouseEvent& event)//实际点击时放置元件
             // 点中元件：选中并准备拖动
             m_selectedGate = clickedGate;
             m_draggingGate = true;
+            m_dragStartCenter = m_selectedGate->center;
 
             m_dragOffset =
                 m_mousePos - m_selectedGate->center;
@@ -687,6 +913,12 @@ void DrawBoard::OnMouseUp(wxMouseEvent& event)
     if (m_draggingGate)
     {
         m_draggingGate = false;
+
+        if (m_selectedGate != nullptr &&
+            m_selectedGate->center != m_dragStartCenter)
+        {
+            MarkModified();
+        }
 
         UpdateWirePositions();
         Refresh(false);
@@ -810,6 +1042,7 @@ void DrawBoard::DeleteSelectedText()
 
     m_texts.erase(m_texts.begin() + m_selectedText);
     m_selectedText = -1;
+    MarkModified();
 
     Refresh(false);
 }
@@ -827,6 +1060,7 @@ void DrawBoard::EditText(int index)
     if (PromptForText(value, m_texts[index].text))
     {
         m_texts[index].text = value;
+        MarkModified();
         Refresh(false);
     }
 }
@@ -978,6 +1212,7 @@ void DrawBoard::OnRightClick(wxMouseEvent& event)
             m_selectedWire < static_cast<int>(m_wires.size()))
         {
             m_wires.erase(m_wires.begin() + m_selectedWire);
+            MarkModified();
         }
         m_selectedWire = -1;
         Refresh(false);
@@ -1021,6 +1256,7 @@ void DrawBoard::DeleteSelectedGate()
 
         delete* it;
         Gates.erase(it);
+        MarkModified();
     }
 
     m_selectedGate = nullptr;
@@ -1207,6 +1443,7 @@ void DrawBoard::CompleteWire(const wxPoint& pos)
     wire.end = endPoint;
 
     m_wires.push_back(wire);
+    MarkModified();
 
     CancelWire();
 }

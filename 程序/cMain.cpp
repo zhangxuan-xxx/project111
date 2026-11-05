@@ -1,5 +1,6 @@
-﻿#include "cMain.h"
+#include "cMain.h"
 
+#include <wx/filename.h>
 #include <wx/listctrl.h>
 #include <wx/statline.h>
 #include <wx/treectrl.h>
@@ -7,6 +8,8 @@
 #include "DrawBoard.h"
 #include "ComponentLibrary.h"
 #include "IconFactory.h"
+#include "Netlist.h"
+#include "SceneIO.h"
 
 namespace
 {
@@ -96,6 +99,19 @@ cMain::cMain()
 
             UpdateToolUi(ID_TOOL_SELECT);
         });
+
+    // 画布内容被修改：标题栏加 *，关闭时提示保存
+    Bind(
+        EVT_DRAWBOARD_MODIFIED,
+        [this](wxCommandEvent&)
+        {
+            SetDirty(true);
+        });
+
+    Bind(wxEVT_CLOSE_WINDOW, &cMain::OnClose, this);
+
+    UpdateTitle();
+    SyncViewState();
 }
 
 cMain::~cMain()
@@ -144,16 +160,26 @@ void cMain::CreateMenuBar()
 
     item(fileMenu, ID_FILE_NEW, wxT("新建"), wxT("Ctrl+N"));
     item(fileMenu, ID_FILE_OPEN, wxT("打开..."), wxT("Ctrl+O"));
+
+    wxMenu* importMenu = new wxMenu();
+    item(importMenu, ID_FILE_IMPORT_DGATE, wxT("DrawGate 图纸 (*.dgate)..."));
+    fileMenu->AppendSubMenu(importMenu, wxT("导入"));
+
     fileMenu->AppendSeparator();
     item(fileMenu, ID_FILE_SAVE, wxT("保存"), wxT("Ctrl+S"));
     item(fileMenu, ID_FILE_SAVEAS, wxT("另存为..."), wxT("Ctrl+Shift+S"));
     fileMenu->AppendSeparator();
 
     wxMenu* exportMenu = new wxMenu();
-    item(exportMenu, ID_FILE_EXPORT_PNG, wxT("导出为 PNG 图片"));
+    item(exportMenu, ID_FILE_EXPORT_PNG, wxT("导出为 PNG 图片..."));
     item(exportMenu, ID_FILE_EXPORT_SVG, wxT("导出为 SVG 矢量图"));
     item(exportMenu, ID_FILE_EXPORT_TRUTH, wxT("导出真值表 (CSV)"));
     fileMenu->AppendSubMenu(exportMenu, wxT("导出"));
+
+    wxMenu* netlistMenu = new wxMenu();
+    item(netlistMenu, ID_FILE_EXPORT_VERILOG, wxT("Verilog 结构网表 (*.v)..."));
+    item(netlistMenu, ID_FILE_EXPORT_BLIF, wxT("BLIF 网表 (*.blif)..."));
+    fileMenu->AppendSubMenu(netlistMenu, wxT("导出网表"));
 
     fileMenu->AppendSeparator();
     item(fileMenu, ID_FILE_EXIT, wxT("退出"), wxT("Alt+F4"));
@@ -329,8 +355,7 @@ void cMain::CreateAppToolBar()
     // -------- 事件绑定 --------
     // 尚无实现的命令：点一下只在状态栏提示
     const int placeholders[] = {
-        ID_FILE_OPEN, ID_FILE_SAVE, ID_FILE_SAVEAS,
-        ID_FILE_EXPORT_PNG, ID_FILE_EXPORT_SVG, ID_FILE_EXPORT_TRUTH,
+        ID_FILE_EXPORT_SVG, ID_FILE_EXPORT_TRUTH,
         ID_EDIT_UNDO, ID_EDIT_REDO, ID_EDIT_CUT, ID_EDIT_COPY,
         ID_EDIT_PASTE, ID_EDIT_SELECTALL,
         ID_VIEW_ZOOMIN, ID_VIEW_ZOOMOUT, ID_VIEW_FIT, ID_VIEW_ACTUAL,
@@ -358,6 +383,15 @@ void cMain::CreateAppToolBar()
     BindCommand(ID_HELP_SHORTCUTS, &cMain::OnShowShortcuts);
     BindCommand(ID_PLACE_TEXT, &cMain::OnPlaceText);
     BindCommand(ID_EDIT_PROPERTIES, &cMain::OnProperties);
+
+    // 文件读写与导出
+    BindCommand(ID_FILE_OPEN, &cMain::OnOpenFile);
+    BindCommand(ID_FILE_IMPORT_DGATE, &cMain::OnImportDgate);
+    BindCommand(ID_FILE_SAVE, &cMain::OnSaveFile);
+    BindCommand(ID_FILE_SAVEAS, &cMain::OnSaveAsFile);
+    BindCommand(ID_FILE_EXPORT_PNG, &cMain::OnExportPng);
+    BindCommand(ID_FILE_EXPORT_VERILOG, &cMain::OnExportVerilog);
+    BindCommand(ID_FILE_EXPORT_BLIF, &cMain::OnExportBlif);
 
     // S 级功能
     BindCommand(ID_FILE_NEW, &cMain::OnNewDocument);
@@ -539,11 +573,19 @@ void cMain::OnNewDocument(wxCommandEvent&)
         return;
     }
 
+    if (!MaybeSaveChanges())
+    {
+        return;
+    }
+
     drawborad->ClearAll();
+
+    m_currentPath.clear();
+    SetDirty(false);
+    UpdateTitle();
 
     SetToolText(wxT("选择"));
     SetStatusText(wxT("已新建空白图纸"), 0);
-    SetTitle(wxT("DrawGate - 未命名"));
 }
 
 // ============================================================
@@ -674,7 +716,13 @@ void cMain::OnShowManual(wxCommandEvent&)
         wxT("  · 状态栏右下角显示当前缩放比例（本版本固定 100%）。\n\n")
         wxT("五、文件\n")
         wxT("  · 新建 (Ctrl+N)：清空画布，开始一张新图。\n")
-        wxT("  · 打开 / 保存 / 导出：界面已就位，功能开发中。\n\n")
+        wxT("  · 打开 (Ctrl+O) / 导入：读取 .dgate 图纸并替换当前画布。\n")
+        wxT("  · 保存 (Ctrl+S) / 另存为：把图纸存成 .dgate（JSON 文本）。\n")
+        wxT("  · 导出 → PNG 图片：把画布内容导出为位图（自动裁边）。\n")
+        wxT("  · 导出网表 → Verilog / BLIF：把连线关系导出为网表，\n")
+        wxT("    可直接交给 Icarus Verilog、Yosys、ABC 等工具。\n")
+        wxT("  · 网表的顶层输入 / 输出由「悬空端口」自动生成，\n")
+        wxT("    命名为 in1… / out1…。\n\n")
         wxT("六、帮助\n")
         wxT("  · 快捷键一览 (Ctrl+F1)：查看全部快捷键及实现状态。\n\n")
         wxT("提示：鼠标移到工具栏按钮上会显示按钮名称和快捷键。\n"));
@@ -712,10 +760,11 @@ void cMain::OnShowShortcuts(wxCommandEvent&)
     };
 
     static const ShortcutRow rows[] = {
-        { wxT("文件"), wxT("Ctrl+N"),       wxT("新建原理图"),            true },
-        { wxT("文件"), wxT("Ctrl+O"),       wxT("打开工程"),              false },
-        { wxT("文件"), wxT("Ctrl+S"),       wxT("保存"),                  false },
-        { wxT("文件"), wxT("Ctrl+Shift+S"), wxT("另存为"),                false },
+        { wxT("文件"), wxT("Ctrl+N"),       wxT("新建原理图"),            true  },
+        { wxT("文件"), wxT("Ctrl+O"),       wxT("打开图纸 (.dgate)"),     true  },
+        { wxT("文件"), wxT("Ctrl+S"),       wxT("保存"),                  true  },
+        { wxT("文件"), wxT("Ctrl+Shift+S"), wxT("另存为"),                true  },
+        { wxT("文件"), wxT("—"),            wxT("导出 PNG / Verilog / BLIF"), true },
         { wxT("文件"), wxT("Alt+F4"),       wxT("退出"),                  true  },
 
         { wxT("编辑"), wxT("Ctrl+Z"),       wxT("撤销"),                  false },
@@ -815,7 +864,7 @@ void cMain::OnAbout(wxCommandEvent&)
     wxMessageBox(
         wxT("DrawGate - 逻辑门绘图\n\n")
         wxT("wxWidgets + MSVC 课程项目\n")
-        wxT("当前版本：界面框架"),
+        wxT("当前版本：1.0（界面 + 文件读写 + 网表导出）"),
         wxT("关于 DrawGate"),
         wxOK | wxICON_INFORMATION,
         this);
@@ -1109,6 +1158,511 @@ void cMain::OnProperties(wxCommandEvent&)
 
     drawborad->Refresh(false);
     SetStatusText(wxT("已更新元件属性"), 0);
+}
+
+// ============================================================
+// 文件：打开 / 导入
+// ============================================================
+wxString cMain::DefaultFileName(const wxString& extension) const
+{
+    if (!m_currentPath.empty())
+    {
+        wxFileName name(m_currentPath);
+        name.SetExt(extension);
+        return name.GetFullName();
+    }
+
+    return wxT("未命名.") + extension;
+}
+
+void cMain::SetDirty(bool dirty)
+{
+    if (m_dirty == dirty)
+    {
+        return;
+    }
+
+    m_dirty = dirty;
+    UpdateTitle();
+}
+
+void cMain::UpdateTitle()
+{
+    const wxString name = m_currentPath.empty()
+        ? wxString(wxT("未命名"))
+        : wxFileName(m_currentPath).GetFullName();
+
+    SetTitle(wxT("DrawGate - ") + name +
+        (m_dirty ? wxString(wxT(" *")) : wxString()));
+}
+
+void cMain::OpenWithDialog(const wxString& title)
+{
+    if (drawborad == nullptr)
+    {
+        return;
+    }
+
+    if (!MaybeSaveChanges())
+    {
+        return;
+    }
+
+    wxFileDialog dialog(
+        this,
+        title,
+        wxEmptyString,
+        wxEmptyString,
+        wxT("DrawGate 图纸 (*.dgate)|*.dgate|")
+        wxT("JSON 文件 (*.json)|*.json|")
+        wxT("所有文件 (*.*)|*.*"),
+        wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+    if (dialog.ShowModal() != wxID_OK)
+    {
+        return;
+    }
+
+    LoadFromFile(dialog.GetPath());
+}
+
+void cMain::OnOpenFile(wxCommandEvent&)
+{
+    OpenWithDialog(wxT("打开图纸"));
+}
+
+void cMain::OnImportDgate(wxCommandEvent&)
+{
+    OpenWithDialog(wxT("导入图纸"));
+}
+
+bool cMain::OpenDocument(const wxString& path)
+{
+    if (drawborad == nullptr)
+    {
+        return false;
+    }
+
+    return LoadFromFile(path);
+}
+
+bool cMain::LoadFromFile(const wxString& path)
+{
+    SceneFileData data;
+    wxString error;
+
+    if (!SceneIO::Load(path, data, error))
+    {
+        wxMessageBox(
+            wxT("打开失败：\n\n") + error,
+            wxT("DrawGate"),
+            wxOK | wxICON_ERROR,
+            this);
+        return false;
+    }
+
+    drawborad->SetScene(
+        std::move(data.gates),
+        std::move(data.wires),
+        data.texts,
+        data.nextGateId,
+        data.gridSize,
+        data.gridVisible,
+        data.snapToGrid);
+
+    m_currentPath = path;
+    m_dirty = false;
+    UpdateTitle();
+    SyncViewState();
+
+    SetToolText(wxT("选择"));
+    UpdateToolUi(ID_TOOL_SELECT);
+
+    SetStatusText(
+        wxString::Format(
+            wxT("已打开：%s"),
+            wxFileName(path).GetFullName()),
+        0);
+
+    return true;
+}
+
+// ============================================================
+// 文件：保存 / 另存为
+// ============================================================
+bool cMain::SaveToFile(const wxString& path)
+{
+    if (drawborad == nullptr)
+    {
+        return false;
+    }
+
+    wxString error;
+
+    if (!SceneIO::Save(
+            path,
+            drawborad->GetGates(),
+            drawborad->GetWires(),
+            drawborad->GetTexts(),
+            drawborad->GetGridSize(),
+            drawborad->IsGridVisible(),
+            drawborad->IsSnapToGrid(),
+            error))
+    {
+        wxMessageBox(
+            wxT("保存失败：\n\n") + error,
+            wxT("DrawGate"),
+            wxOK | wxICON_ERROR,
+            this);
+        return false;
+    }
+
+    m_currentPath = path;
+    SetDirty(false);
+    UpdateTitle();
+
+    SetStatusText(
+        wxString::Format(
+            wxT("已保存：%s"),
+            wxFileName(path).GetFullName()),
+        0);
+
+    return true;
+}
+
+bool cMain::DoSave(bool forceDialog)
+{
+    if (m_currentPath.empty() || forceDialog)
+    {
+        return DoSaveAs();
+    }
+
+    return SaveToFile(m_currentPath);
+}
+
+bool cMain::DoSaveAs()
+{
+    wxFileDialog dialog(
+        this,
+        wxT("另存为"),
+        wxEmptyString,
+        DefaultFileName(wxT("dgate")),
+        wxT("DrawGate 图纸 (*.dgate)|*.dgate|")
+        wxT("JSON 文件 (*.json)|*.json"),
+        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+    if (dialog.ShowModal() != wxID_OK)
+    {
+        return false;
+    }
+
+    wxString path = dialog.GetPath();
+
+    if (wxFileName(path).GetExt().empty())
+    {
+        path += wxT(".dgate");
+    }
+
+    return SaveToFile(path);
+}
+
+bool cMain::MaybeSaveChanges()
+{
+    if (!m_dirty)
+    {
+        return true;
+    }
+
+    const int answer = wxMessageBox(
+        wxT("当前图纸尚未保存，是否保存修改？"),
+        wxT("DrawGate"),
+        wxYES_NO | wxCANCEL | wxICON_QUESTION,
+        this);
+
+    if (answer == wxCANCEL)
+    {
+        return false;
+    }
+
+    if (answer == wxNO)
+    {
+        return true;
+    }
+
+    return DoSave(false);
+}
+
+void cMain::OnSaveFile(wxCommandEvent&)
+{
+    DoSave(false);
+}
+
+void cMain::OnSaveAsFile(wxCommandEvent&)
+{
+    DoSave(true);
+}
+
+void cMain::OnClose(wxCloseEvent& evt)
+{
+    if (!MaybeSaveChanges())
+    {
+        evt.Veto();
+        return;
+    }
+
+    evt.Skip();
+}
+
+// ============================================================
+// 导出 PNG
+// ============================================================
+void cMain::OnExportPng(wxCommandEvent&)
+{
+    if (drawborad == nullptr)
+    {
+        return;
+    }
+
+    if (drawborad->GetGates().empty() &&
+        drawborad->GetWires().empty() &&
+        drawborad->GetTexts().empty())
+    {
+        wxMessageBox(
+            wxT("画布是空的，没有可导出的内容。"),
+            wxT("导出 PNG"),
+            wxOK | wxICON_INFORMATION,
+            this);
+        return;
+    }
+
+    wxFileDialog dialog(
+        this,
+        wxT("导出为 PNG 图片"),
+        wxEmptyString,
+        DefaultFileName(wxT("png")),
+        wxT("PNG 图片 (*.png)|*.png"),
+        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+    if (dialog.ShowModal() != wxID_OK)
+    {
+        return;
+    }
+
+    wxString path = dialog.GetPath();
+
+    if (wxFileName(path).GetExt().empty())
+    {
+        path += wxT(".png");
+    }
+
+    wxString error;
+
+    if (!drawborad->ExportPng(path, error))
+    {
+        wxMessageBox(
+            wxT("导出失败：\n\n") + error,
+            wxT("导出 PNG"),
+            wxOK | wxICON_ERROR,
+            this);
+        return;
+    }
+
+    SetStatusText(
+        wxString::Format(
+            wxT("已导出 PNG：%s"),
+            wxFileName(path).GetFullName()),
+        0);
+}
+
+// ============================================================
+// 导出网表（Verilog / BLIF）
+// ============================================================
+void cMain::ShowExportSummary(const wxString& kind,
+                              const NetlistSummary& summary,
+                              const wxString& path)
+{
+    SetStatusText(
+        wxString::Format(
+            wxT("已导出 %s：%d 个元件，%d 条网络（输入 %d / 输出 %d）"),
+            kind,
+            summary.instances,
+            summary.nets,
+            summary.inputs,
+            summary.outputs),
+        0);
+
+    if (summary.warnings > 0)
+    {
+        wxMessageBox(
+            wxString::Format(
+                wxT("网表已导出到：\n%s\n\n")
+                wxT("注意：有 %d 条警告。\n")
+                wxT("常见原因是：自由连线没有接到端口，")
+                wxT("或同一网络上有多个输出端直接相连。"),
+                path,
+                summary.warnings),
+            wxT("导出完成"),
+            wxOK | wxICON_WARNING,
+            this);
+    }
+}
+
+void cMain::OnExportVerilog(wxCommandEvent&)
+{
+    if (drawborad == nullptr)
+    {
+        return;
+    }
+
+    if (drawborad->GetGates().empty())
+    {
+        wxMessageBox(
+            wxT("画布上没有元件，无法导出网表。"),
+            wxT("导出网表"),
+            wxOK | wxICON_INFORMATION,
+            this);
+        return;
+    }
+
+    wxFileDialog dialog(
+        this,
+        wxT("导出 Verilog 网表"),
+        wxEmptyString,
+        DefaultFileName(wxT("v")),
+        wxT("Verilog 网表 (*.v)|*.v"),
+        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+    if (dialog.ShowModal() != wxID_OK)
+    {
+        return;
+    }
+
+    wxString path = dialog.GetPath();
+
+    if (wxFileName(path).GetExt().empty())
+    {
+        path += wxT(".v");
+    }
+
+    NetlistSummary summary;
+    wxString error;
+
+    if (!Netlist::ExportVerilog(
+            path,
+            drawborad->GetGates(),
+            drawborad->GetWires(),
+            wxFileName(path).GetName(),
+            summary,
+            error))
+    {
+        wxMessageBox(
+            wxT("导出失败：\n\n") + error,
+            wxT("导出网表"),
+            wxOK | wxICON_ERROR,
+            this);
+        return;
+    }
+
+    ShowExportSummary(wxT("Verilog"), summary, path);
+}
+
+void cMain::OnExportBlif(wxCommandEvent&)
+{
+    if (drawborad == nullptr)
+    {
+        return;
+    }
+
+    if (drawborad->GetGates().empty())
+    {
+        wxMessageBox(
+            wxT("画布上没有元件，无法导出网表。"),
+            wxT("导出网表"),
+            wxOK | wxICON_INFORMATION,
+            this);
+        return;
+    }
+
+    wxFileDialog dialog(
+        this,
+        wxT("导出 BLIF 网表"),
+        wxEmptyString,
+        DefaultFileName(wxT("blif")),
+        wxT("BLIF 网表 (*.blif)|*.blif"),
+        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+    if (dialog.ShowModal() != wxID_OK)
+    {
+        return;
+    }
+
+    wxString path = dialog.GetPath();
+
+    if (wxFileName(path).GetExt().empty())
+    {
+        path += wxT(".blif");
+    }
+
+    NetlistSummary summary;
+    wxString error;
+
+    if (!Netlist::ExportBlif(
+            path,
+            drawborad->GetGates(),
+            drawborad->GetWires(),
+            wxFileName(path).GetName(),
+            summary,
+            error))
+    {
+        wxMessageBox(
+            wxT("导出失败：\n\n") + error,
+            wxT("导出网表"),
+            wxOK | wxICON_ERROR,
+            this);
+        return;
+    }
+
+    ShowExportSummary(wxT("BLIF"), summary, path);
+}
+
+// ============================================================
+// 让「视图」菜单与工具栏跟画布的实际设置同步（打开文件后调用）
+// ============================================================
+void cMain::SyncViewState()
+{
+    if (drawborad == nullptr)
+    {
+        return;
+    }
+
+    if (wxMenuBar* bar = GetMenuBar())
+    {
+        if (wxMenuItem* menuItem = bar->FindItem(ID_VIEW_GRID))
+        {
+            menuItem->Check(drawborad->IsGridVisible());
+        }
+
+        if (wxMenuItem* menuItem = bar->FindItem(ID_VIEW_SNAP))
+        {
+            menuItem->Check(drawborad->IsSnapToGrid());
+        }
+
+        const int gridSize = drawborad->GetGridSize();
+
+        const int sizeId = gridSize == 10 ? ID_VIEW_GRIDSIZE_10
+            : gridSize == 50 ? ID_VIEW_GRIDSIZE_50
+            : ID_VIEW_GRIDSIZE_20;
+
+        if (wxMenuItem* menuItem = bar->FindItem(sizeId))
+        {
+            menuItem->Check(true);
+        }
+    }
+
+    if (wxToolBar* bar = GetToolBar())
+    {
+        bar->ToggleTool(ID_VIEW_GRID, drawborad->IsGridVisible());
+    }
 }
 
 // ============================================================

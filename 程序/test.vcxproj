@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -150,6 +150,10 @@
     <ClCompile Include="ComponentLibrary.cpp" />
     <ClCompile Include="DrawBoard.cpp" />
     <ClCompile Include="IconFactory.cpp" />
+    <ClCompile Include="Json.cpp" />
+    <ClCompile Include="Netlist.cpp" />
+    <ClCompile Include="SceneIO.cpp" />
+    <ClCompile Include="SelfTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h" />
@@ -159,6 +163,10 @@
     <ClInclude Include="compoent.h" />
     <ClInclude Include="DrawBoard.h" />
     <ClInclude Include="IconFactory.h" />
+    <ClInclude Include="Json.h" />
+    <ClInclude Include="Netlist.h" />
+    <ClInclude Include="SceneIO.h" />
+    <ClInclude Include="SelfTest.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
