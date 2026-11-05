@@ -7,6 +7,7 @@
 #include <wx/textctrl.h>
 #include <wx/gdicmn.h>
 #include <vector>
+#include <optional>
 #include <algorithm>
 #include "compoent.h"
 
@@ -30,6 +31,8 @@ public:
     {
         m_currentTool = tool;
     }
+    void BeginPlaceCustom(
+        const CustomGateDefinition& definition);
 
     // -------- 网格显示 / 大小 / 吸附 --------
     bool IsGridVisible() const
@@ -66,6 +69,8 @@ public:
     bool isDrawingXorGate = false;
     bool isDrawingNorGate = false;
     bool isDrawingXnorGate = false;
+    bool isDrawingInputSwitch = false;
+    bool isDrawingOutputIndicator = false;
 
     // 供主窗口读取当前选中对象（属性对话框用）
     Gate* GetSelectedGate() const
@@ -139,7 +144,13 @@ public:
     // 标记图纸已修改（外部改动时调用）
     void MarkModified();
 
+    // 根据当前开关状态和连线关系重新计算组合逻辑。
+    bool RecalculateCircuit(wxString& error);
+
 private:
+    // 等待用户点击画布放置的自定义元件
+    std::optional<CustomGateDefinition> m_pendingCustomGate;
+
     // 当前工具
     ToolType m_currentTool = TOOL_SELECT;
 

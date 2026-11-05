@@ -26,10 +26,14 @@ private:
     void CreateMenuBar();
     void CreateAppToolBar();
     void CreateLeftPanel();
+    void PopulateComponentTree();
     void OnLibraryItemActivated(wxTreeEvent& evt);
 
     // 左栏元件库 -> 画布放置模式
     void PlaceGate(LibraryComponentType type);
+    void PlaceCustomComponent(
+        const CustomGateDefinition& definition);
+    void OnManageLibrary(wxCommandEvent& evt);
 
     // 统一的“尚未实现”占位处理，只在状态栏给一条提示
     void OnPlaceholder(wxCommandEvent& evt);

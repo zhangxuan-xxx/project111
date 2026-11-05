@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "ComponentLibrary.h"
 #include "DrawBoard.h"
 #include "Netlist.h"
 #include "SceneIO.h"
@@ -224,6 +225,298 @@ int RunSelfTest(const wxString& logPath)
             report.Check(
                 blifSummary.instances == 3, "BLIF instances == 3");
         }
+    }
+
+    // --------------------------------------------------------
+    // 3.1 自定义元件：真值表求值、工程往返、仿真及网表导出
+    // --------------------------------------------------------
+    {
+        wxString libraryError;
+        const bool libraryLoaded =
+            ComponentLibrary::LoadCustomComponents(libraryError);
+
+        report.Check(
+            libraryLoaded,
+            "Load custom component library: " +
+                ToUtf8(libraryError));
+
+        const wxString libraryTestName =
+            wxT("__DrawGate自检元件__");
+
+        for (std::size_t i = 0;
+             i < ComponentLibrary::GetCustomComponents().size();
+             ++i)
+        {
+            if (ComponentLibrary::GetCustomComponents()[i].name ==
+                libraryTestName)
+            {
+                ComponentLibrary::DeleteCustomComponent(i, libraryError);
+                break;
+            }
+        }
+
+        CustomGateDefinition definition;
+        definition.name = wxT("自定义异或");
+        definition.inputCount = 2;
+        definition.truthTable = 0x6; // 01 和 10 时输出 1
+
+        CustomGateDefinition libraryDefinition = definition;
+        libraryDefinition.name = libraryTestName;
+        libraryError.clear();
+        const bool libraryAdded =
+            ComponentLibrary::AddCustomComponent(
+                libraryDefinition, libraryError);
+        report.Check(
+            libraryAdded,
+            "Save custom component library: " +
+                ToUtf8(libraryError));
+
+        libraryError.clear();
+        const bool libraryReloaded =
+            ComponentLibrary::LoadCustomComponents(libraryError);
+        bool foundInLibrary = false;
+
+        if (libraryReloaded)
+        {
+            for (const CustomGateDefinition& item :
+                 ComponentLibrary::GetCustomComponents())
+            {
+                if (item.name == libraryTestName &&
+                    item.inputCount == 2 &&
+                    item.truthTable == 6)
+                {
+                    foundInLibrary = true;
+                    break;
+                }
+            }
+        }
+
+        report.Check(
+            libraryReloaded && foundInLibrary,
+            "Custom component library round-trip");
+
+        for (std::size_t i = 0;
+             i < ComponentLibrary::GetCustomComponents().size();
+             ++i)
+        {
+            if (ComponentLibrary::GetCustomComponents()[i].name ==
+                libraryTestName)
+            {
+                ComponentLibrary::DeleteCustomComponent(i, libraryError);
+                break;
+            }
+        }
+
+        CustomGate standalone(wxPoint(100, 100), definition);
+        bool output = false;
+        bool evaluateOk = true;
+
+        for (int a = 0; a <= 1; ++a)
+        {
+            for (int b = 0; b <= 1; ++b)
+            {
+                std::vector<bool> inputs = {
+                    a != 0, b != 0
+                };
+
+                if (!standalone.Evaluate(inputs, output) ||
+                    output != (a != b))
+                {
+                    evaluateOk = false;
+                }
+            }
+        }
+
+        report.Check(
+            evaluateOk,
+            "custom gate truth table evaluation (XOR)");
+
+        std::vector<Gate*> customGates;
+        Gate* savedCustom =
+            new CustomGate(wxPoint(240, 180), definition);
+        savedCustom->id = 201;
+        savedCustom->label = wxT("C1");
+        customGates.push_back(savedCustom);
+
+        const wxString customPath =
+            TempFile(wxT("drawgate-custom-selftest.dgate"));
+        wxString customError;
+
+        const bool customSaved = SceneIO::Save(
+            customPath, customGates, {},
+            {}, 20, true, true, customError);
+
+        report.Check(
+            customSaved,
+            "Save custom .dgate: " + ToUtf8(customError));
+
+        delete savedCustom;
+        customGates.clear();
+
+        SceneFileData customData;
+        customError.clear();
+        const bool customLoaded =
+            SceneIO::Load(customPath, customData, customError);
+
+        report.Check(
+            customLoaded,
+            "Load custom .dgate: " + ToUtf8(customError));
+
+        if (customLoaded && customData.gates.size() == 1)
+        {
+            const CustomGate* loadedCustom =
+                dynamic_cast<const CustomGate*>(
+                    customData.gates[0]);
+
+            report.Check(
+                loadedCustom != nullptr &&
+                loadedCustom->GetDefinition().name ==
+                    definition.name &&
+                loadedCustom->GetDefinition().inputCount == 2 &&
+                loadedCustom->GetDefinition().truthTable == 6,
+                "custom definition round-trip");
+        }
+
+        for (Gate* gate : customData.gates)
+        {
+            delete gate;
+        }
+
+        // ---- 自定义元件的动态仿真 ----
+        wxFrame* customFrame = new wxFrame(
+            nullptr, wxID_ANY, wxT("Custom Gate SelfTest"));
+        DrawBoard* customBoard = new DrawBoard(customFrame);
+
+        Gate* inputA = new InputSwitch(wxPoint(100, 160));
+        inputA->id = 301;
+
+        Gate* inputB = new InputSwitch(wxPoint(100, 260));
+        inputB->id = 302;
+
+        Gate* simulatedCustom =
+            new CustomGate(wxPoint(320, 210), definition);
+        simulatedCustom->id = 303;
+
+        Gate* outputGate = new OutputIndicator(wxPoint(520, 210));
+        outputGate->id = 304;
+
+        std::vector<Wire> customWires(3);
+
+        customWires[0].start = inputA->GetOutputPort();
+        customWires[0].end = simulatedCustom->GetInputPort(0);
+        customWires[0].startComponentId = 301;
+        customWires[0].endComponentId = 303;
+        customWires[0].endPortIndex = 0;
+
+        customWires[1].start = inputB->GetOutputPort();
+        customWires[1].end = simulatedCustom->GetInputPort(1);
+        customWires[1].startComponentId = 302;
+        customWires[1].endComponentId = 303;
+        customWires[1].endPortIndex = 1;
+
+        customWires[2].start = simulatedCustom->GetOutputPort();
+        customWires[2].end = outputGate->GetInputPort(0);
+        customWires[2].startComponentId = 303;
+        customWires[2].endComponentId = 304;
+        customWires[2].endPortIndex = 0;
+
+        customBoard->SetScene(
+            { inputA, inputB, simulatedCustom, outputGate },
+            customWires, {}, 305, 20, true, true);
+
+        bool simulationOk = true;
+
+        for (int a = 0; a <= 1; ++a)
+        {
+            for (int b = 0; b <= 1; ++b)
+            {
+                Gate* currentA = nullptr;
+                Gate* currentB = nullptr;
+                Gate* currentOutput = nullptr;
+
+                for (Gate* gate : customBoard->GetGates())
+                {
+                    if (gate->id == 301) currentA = gate;
+                    if (gate->id == 302) currentB = gate;
+                    if (gate->id == 304) currentOutput = gate;
+                }
+
+                if (currentA == nullptr ||
+                    currentB == nullptr ||
+                    currentOutput == nullptr)
+                {
+                    simulationOk = false;
+                    break;
+                }
+
+                currentA->logicValue = a != 0;
+                currentB->logicValue = b != 0;
+
+                wxString simulationError;
+
+                if (!customBoard->RecalculateCircuit(
+                        simulationError) ||
+                    currentOutput->logicValue != (a != b))
+                {
+                    simulationOk = false;
+                }
+            }
+        }
+
+        report.Check(
+            simulationOk,
+            "custom gate dynamic propagation");
+
+        NetlistSummary customSummary;
+        wxString customNetlistError;
+        const wxString customVerilogPath =
+            TempFile(wxT("drawgate-custom-selftest.v"));
+        const wxString customBlifPath =
+            TempFile(wxT("drawgate-custom-selftest.blif"));
+
+        const bool customVerilogOk = Netlist::ExportVerilog(
+            customVerilogPath,
+            customBoard->GetGates(),
+            customBoard->GetWires(),
+            wxT("custom_selftest"), customSummary,
+            customNetlistError);
+
+        report.Check(
+            customVerilogOk,
+            "Export custom Verilog: " +
+                ToUtf8(customNetlistError));
+
+        if (customVerilogOk)
+        {
+            const std::string text = ReadFile(customVerilogPath);
+            report.Check(
+                text.find("assign ") != std::string::npos,
+                "Verilog contains custom assign");
+        }
+
+        customNetlistError.clear();
+        const bool customBlifOk = Netlist::ExportBlif(
+            customBlifPath,
+            customBoard->GetGates(),
+            customBoard->GetWires(),
+            wxT("custom_selftest"), customSummary,
+            customNetlistError);
+
+        report.Check(
+            customBlifOk,
+            "Export custom BLIF: " +
+                ToUtf8(customNetlistError));
+
+        if (customBlifOk)
+        {
+            const std::string text = ReadFile(customBlifPath);
+            report.Check(
+                text.find("01 1") != std::string::npos &&
+                text.find("10 1") != std::string::npos,
+                "BLIF contains custom truth-table rows");
+        }
+
+        delete customFrame;
     }
 
     // --------------------------------------------------------

@@ -3,7 +3,10 @@
 
 #include <wx/wx.h>
 #include <wx/graphics.h>
+#include <algorithm>
+#include <cstdint>
 #include <cmath>
+#include <vector>
 
 // ============================================================
 // 工具类型
@@ -73,9 +76,19 @@ enum GateType
     NAND_GATE,
     XOR_GATE,
     NOR_GATE,
-    XNOR_GATE
+    XNOR_GATE,
+    INPUT_SWITCH,
+    OUTPUT_INDICATOR,
+
+    CUSTOM_GATE
 };
 
+struct CustomGateDefinition
+{
+    wxString name;
+    int inputCount = 2;
+    std::uint32_t truthTable = 0;
+};
 // ============================================================
 // 元件基类
 // ============================================================
@@ -93,6 +106,8 @@ public:
 
     bool scaling = false;
     bool moving = false;
+    bool logicValue = false;
+    bool logicValid = false;
 
     virtual ~Component() = default;
 };
@@ -162,6 +177,66 @@ public:
 
     // 子类负责绘制自身
     virtual void drawSelf(wxMemoryDC& memDC) const = 0;
+};
+
+// 输入开关与输出指示灯沿用 Gate 的端口/画布接口，方便接入现有连线系统。
+class InputSwitch : public Gate
+{
+public:
+    explicit InputSwitch(wxPoint center) : Gate(center)
+    {
+        type = INPUT_SWITCH;
+        scale = 1.0;
+        logicValid = true;
+    }
+
+    int GetInputCount() const override { return 0; }
+    wxPoint GetOutputPort() const override
+    {
+        return wxPoint(center.x + 40, center.y);
+    }
+
+    void drawSelf(wxMemoryDC& dc) const override
+    {
+        dc.SetPen(wxPen(wxColour(35, 75, 110), 2));
+        dc.SetBrush(logicValue ? wxBrush(wxColour(95, 205, 120))
+                               : wxBrush(wxColour(220, 225, 230)));
+        dc.DrawRoundedRectangle(center.x - 28, center.y - 20, 56, 40, 6);
+        dc.SetTextForeground(wxColour(25, 35, 45));
+        dc.DrawText(logicValue ? wxT("1") : wxT("0"), center.x - 5, center.y - 9);
+        dc.DrawLine(center.x + 28, center.y, center.x + 40, center.y);
+    }
+};
+
+class OutputIndicator : public Gate
+{
+public:
+    explicit OutputIndicator(wxPoint center) : Gate(center)
+    {
+        type = OUTPUT_INDICATOR;
+        scale = 1.0;
+    }
+
+    int GetInputCount() const override { return 1; }
+    wxPoint GetInputPort(int) const override
+    {
+        return wxPoint(center.x - 40, center.y);
+    }
+    wxPoint GetOutputPort() const override { return center; }
+
+    void drawSelf(wxMemoryDC& dc) const override
+    {
+        dc.SetPen(wxPen(wxColour(45, 55, 70), 2));
+        dc.SetBrush(logicValid
+            ? (logicValue ? wxBrush(wxColour(70, 205, 115))
+                          : wxBrush(wxColour(190, 195, 200)))
+            : wxBrush(wxColour(245, 195, 90)));
+        dc.DrawCircle(center.x, center.y, 18);
+        dc.SetTextForeground(wxColour(20, 30, 40));
+        dc.DrawText(logicValid ? (logicValue ? wxT("1") : wxT("0"))
+                               : wxT("?"), center.x - 5, center.y - 9);
+        dc.DrawLine(center.x - 40, center.y, center.x - 18, center.y);
+    }
 };
 
 // ============================================================
@@ -777,3 +852,126 @@ private:
     }
 };
 
+class CustomGate : public Gate
+{
+public:
+    CustomGate(wxPoint center,
+        const CustomGateDefinition& definition)
+        : Gate(center), m_definition(definition)
+    {
+        type = CUSTOM_GATE;
+        scale = 1.0;
+    }
+
+    int GetInputCount() const override
+    {
+        return m_definition.inputCount;
+    }
+
+    wxPoint GetInputPort(int index) const override
+    {
+        const int step = 24;
+        const int total = (m_definition.inputCount - 1) * step;
+
+        return wxPoint(
+            center.x - static_cast<int>(42 * scale),
+            center.y - total / 2 + index * step);
+    }
+
+    wxPoint GetOutputPort() const override
+    {
+        return wxPoint(
+            center.x + static_cast<int>(52 * scale),
+            center.y);
+    }
+
+    const CustomGateDefinition& GetDefinition() const
+    {
+        return m_definition;
+    }
+
+    bool Evaluate(const std::vector<bool>& inputs, bool& output) const
+    {
+        if (static_cast<int>(inputs.size()) != m_definition.inputCount)
+        {
+            return false;
+        }
+
+        int row = 0;
+
+        for (int i = 0; i < m_definition.inputCount; ++i)
+        {
+            row = (row << 1) | (inputs[i] ? 1 : 0);
+        }
+
+        output = ((m_definition.truthTable >> row) & 1U) != 0;
+        return true;
+    }
+
+    void drawSelf(wxMemoryDC& dc) const override
+    {
+        const int halfHeight = GetBodyHalfHeight();
+        const int left = center.x - static_cast<int>(32 * scale);
+        const int right = center.x + static_cast<int>(32 * scale);
+        const int top = center.y - static_cast<int>(halfHeight * scale);
+        const int bottom = center.y + static_cast<int>(halfHeight * scale);
+
+        dc.SetPen(wxPen(wxColour(45, 82, 120), 2));
+        dc.SetBrush(wxBrush(wxColour(246, 250, 255)));
+        dc.DrawRoundedRectangle(
+            left, top, right - left, bottom - top,
+            static_cast<int>(7 * scale));
+
+        dc.SetPen(wxPen(wxColour(45, 82, 120), 2));
+
+        for (int i = 0; i < m_definition.inputCount; ++i)
+        {
+            const wxPoint port = GetInputPort(i);
+            dc.DrawLine(port.x, port.y, left, port.y);
+        }
+
+        const wxPoint outputPort = GetOutputPort();
+        dc.DrawLine(right, center.y, outputPort.x, outputPort.y);
+
+        wxFont nameFont(
+            9, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL,
+            wxFONTWEIGHT_BOLD);
+        dc.SetFont(nameFont);
+        dc.SetTextForeground(wxColour(35, 48, 62));
+
+        wxString displayName = m_definition.name;
+        int textWidth = 0;
+        int textHeight = 0;
+        dc.GetTextExtent(displayName, &textWidth, &textHeight);
+        const int maxTextWidth = right - left - 10;
+
+        if (textWidth > maxTextWidth && !displayName.empty())
+        {
+            while (!displayName.empty())
+            {
+                displayName.RemoveLast();
+                dc.GetTextExtent(displayName + wxT("..."), &textWidth, &textHeight);
+
+                if (textWidth <= maxTextWidth)
+                {
+                    displayName += wxT("...");
+                    break;
+                }
+            }
+        }
+
+        dc.GetTextExtent(displayName, &textWidth, &textHeight);
+        dc.DrawText(
+            displayName,
+            center.x - textWidth / 2,
+            center.y - textHeight / 2);
+    }
+
+    int GetBodyHalfHeight() const
+    {
+        return std::max(25, (m_definition.inputCount - 1) * 12 + 17);
+    }
+
+private:
+    CustomGateDefinition m_definition;
+};

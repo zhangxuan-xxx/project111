@@ -1,9 +1,13 @@
 #include "cMain.h"
 
+#include <wx/grid.h>
 #include <wx/filename.h>
 #include <wx/listctrl.h>
+#include <wx/spinctrl.h>
 #include <wx/statline.h>
 #include <wx/treectrl.h>
+
+#include <cstddef>
 
 #include "DrawBoard.h"
 #include "ComponentLibrary.h"
@@ -21,7 +25,464 @@ namespace
         {
         }
 
+        explicit ComponentTreeItemData(
+            const CustomGateDefinition& customDefinition)
+            : isCustom(true), custom(customDefinition)
+        {
+        }
+
+        bool isCustom = false;
         LibraryComponentType type;
+        CustomGateDefinition custom;
+    };
+
+    GateType ToGateType(LibraryComponentType type)
+    {
+        switch (type)
+        {
+        case LibraryComponentType::AndGate: return AND;
+        case LibraryComponentType::OrGate: return OR;
+        case LibraryComponentType::NotGate: return NOT;
+        case LibraryComponentType::NandGate: return NAND_GATE;
+        case LibraryComponentType::XorGate: return XOR_GATE;
+        case LibraryComponentType::NorGate: return NOR_GATE;
+        case LibraryComponentType::XnorGate: return XNOR_GATE;
+        case LibraryComponentType::InputSwitch: return INPUT_SWITCH;
+        case LibraryComponentType::OutputIndicator: return OUTPUT_INDICATOR;
+        default: return AND;
+        }
+    }
+}
+
+namespace
+{
+    class CustomGateEditorDialog : public wxDialog
+    {
+    public:
+        CustomGateEditorDialog(
+            wxWindow* parent,
+            const CustomGateDefinition& initial)
+            : wxDialog(
+                parent, wxID_ANY, wxT("编辑自定义元件"),
+                wxDefaultPosition, wxSize(560, 650),
+                wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
+              m_definition(initial)
+        {
+            wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+
+            wxFlexGridSizer* fields = new wxFlexGridSizer(2, 10, 14);
+            fields->AddGrowableCol(1, 1);
+
+            m_name = new wxTextCtrl(
+                this, wxID_ANY, initial.name);
+
+            m_inputCount = new wxSpinCtrl(
+                this, wxID_ANY, wxEmptyString,
+                wxDefaultPosition, wxDefaultSize,
+                wxSP_ARROW_KEYS, 1, 4,
+                initial.inputCount);
+
+            fields->Add(
+                new wxStaticText(this, wxID_ANY, wxT("元件名称：")),
+                0, wxALIGN_CENTER_VERTICAL);
+            fields->Add(m_name, 1, wxEXPAND);
+            fields->Add(
+                new wxStaticText(this, wxID_ANY, wxT("输入数量：")),
+                0, wxALIGN_CENTER_VERTICAL);
+            fields->Add(m_inputCount, 0);
+            sizer->Add(fields, 0, wxEXPAND | wxALL, 16);
+
+            wxStaticText* help = new wxStaticText(
+                this, wxID_ANY,
+                wxT("输入顺序为从上到下，组合按 00、01、10……递增。\n")
+                wxT("输出列只能填写 0 或 1。例如二输入异或应填写 0、1、1、0。"));
+            help->SetForegroundColour(wxColour(90, 96, 105));
+            sizer->Add(help, 0, wxLEFT | wxRIGHT | wxBOTTOM, 16);
+
+            m_grid = new wxGrid(
+                this, wxID_ANY,
+                wxDefaultPosition, wxDefaultSize,
+                wxBORDER_THEME);
+            m_grid->CreateGrid(0, 2);
+            m_grid->SetColLabelValue(0, wxT("输入组合"));
+            m_grid->SetColLabelValue(1, wxT("输出"));
+            m_grid->SetColSize(0, 240);
+            m_grid->SetColSize(1, 180);
+            m_grid->SetRowLabelSize(45);
+            m_grid->EnableDragColSize(false);
+            m_grid->EnableDragRowSize(false);
+            sizer->Add(m_grid, 1, wxEXPAND | wxLEFT | wxRIGHT, 16);
+
+            wxBoxSizer* buttons = new wxBoxSizer(wxHORIZONTAL);
+            buttons->AddStretchSpacer();
+            wxButton* cancel =
+                new wxButton(this, wxID_CANCEL, wxT("取消"));
+            wxButton* ok =
+                new wxButton(this, wxID_OK, wxT("保存"));
+            ok->SetDefault();
+            buttons->Add(cancel, 0, wxRIGHT, 8);
+            buttons->Add(ok, 0);
+            sizer->Add(buttons, 0, wxEXPAND | wxALL, 16);
+
+            SetSizer(sizer);
+
+            if (initial.inputCount >= 1 && initial.inputCount <= 4)
+            {
+                for (int row = 0;
+                     row < (1 << initial.inputCount);
+                     ++row)
+                {
+                    m_outputs.push_back(
+                        ((initial.truthTable >> row) & 1U)
+                            ? wxT("1") : wxT("0"));
+                }
+            }
+            else
+            {
+                m_outputs.assign(4, wxT("0"));
+            }
+
+            RebuildGrid();
+            auto refreshInputCount = [this](wxCommandEvent&)
+            {
+                const int count = m_inputCount->GetValue();
+
+                if (count < 1 || count > 4 ||
+                    m_grid->GetNumberRows() == (1 << count))
+                {
+                    return;
+                }
+
+                ReadGridOutputs();
+                RebuildGrid();
+            };
+            m_inputCount->Bind(wxEVT_SPINCTRL, refreshInputCount);
+            m_inputCount->Bind(wxEVT_TEXT, refreshInputCount);
+            ok->Bind(wxEVT_BUTTON, &CustomGateEditorDialog::OnOk, this);
+            CentreOnParent();
+            m_name->SetFocus();
+            m_name->SelectAll();
+        }
+
+        const CustomGateDefinition& GetDefinition() const
+        {
+            return m_definition;
+        }
+
+    private:
+        void ReadGridOutputs()
+        {
+            m_outputs.clear();
+
+            for (int row = 0; row < m_grid->GetNumberRows(); ++row)
+            {
+                m_outputs.push_back(m_grid->GetCellValue(row, 1));
+            }
+        }
+
+        void RebuildGrid()
+        {
+            const int count = m_inputCount->GetValue();
+            const int rowCount = 1 << count;
+
+            if (m_outputs.size() < static_cast<std::size_t>(rowCount))
+            {
+                m_outputs.resize(rowCount, wxT("0"));
+            }
+
+            if (m_grid->GetNumberRows() > 0)
+            {
+                m_grid->DeleteRows(0, m_grid->GetNumberRows());
+            }
+
+            m_grid->AppendRows(rowCount);
+
+            for (int row = 0; row < rowCount; ++row)
+            {
+                wxString combination;
+
+                for (int bit = count - 1; bit >= 0; --bit)
+                {
+                    if (!combination.empty())
+                    {
+                        combination += wxT("  ");
+                    }
+
+                    combination +=
+                        ((row >> bit) & 1) ? wxT("1") : wxT("0");
+                }
+
+                m_grid->SetCellValue(row, 0, combination);
+                m_grid->SetReadOnly(row, 0);
+                m_grid->SetCellAlignment(
+                    row, 0, wxALIGN_CENTRE, wxALIGN_CENTRE);
+
+                wxString output =
+                    row < static_cast<int>(m_outputs.size())
+                        ? m_outputs[row] : wxString(wxT("0"));
+
+                if (output != wxT("0") && output != wxT("1"))
+                {
+                    output = wxT("0");
+                }
+
+                m_grid->SetCellValue(row, 1, output);
+                m_grid->SetCellAlignment(
+                    row, 1, wxALIGN_CENTRE, wxALIGN_CENTRE);
+                m_grid->SetRowLabelValue(
+                    row, wxString::Format(wxT("%d"), row));
+            }
+        }
+
+        void OnOk(wxCommandEvent&)
+        {
+            wxString name = m_name->GetValue();
+            name.Trim(true);
+            name.Trim(false);
+
+            if (name.empty())
+            {
+                wxMessageBox(
+                    wxT("请先填写元件名称。"),
+                    wxT("无法保存"), wxOK | wxICON_WARNING, this);
+                m_name->SetFocus();
+                return;
+            }
+
+            const int count = m_inputCount->GetValue();
+            const int rowCount = 1 << count;
+            std::uint32_t truthTable = 0;
+
+            for (int row = 0; row < rowCount; ++row)
+            {
+                wxString output = m_grid->GetCellValue(row, 1);
+                output.Trim(true);
+                output.Trim(false);
+
+                if (output != wxT("0") && output != wxT("1"))
+                {
+                    wxMessageBox(
+                        wxString::Format(
+                            wxT("第 %d 行的输出必须填写 0 或 1。"),
+                            row + 1),
+                        wxT("真值表格式错误"),
+                        wxOK | wxICON_WARNING, this);
+                    return;
+                }
+
+                if (output == wxT("1"))
+                {
+                    truthTable |= (1U << row);
+                }
+            }
+
+            m_definition.name = name;
+            m_definition.inputCount = count;
+            m_definition.truthTable = truthTable;
+            EndModal(wxID_OK);
+        }
+
+        wxTextCtrl* m_name = nullptr;
+        wxSpinCtrl* m_inputCount = nullptr;
+        wxGrid* m_grid = nullptr;
+        std::vector<wxString> m_outputs;
+        CustomGateDefinition m_definition;
+    };
+
+    class CustomComponentManagerDialog : public wxDialog
+    {
+    public:
+        explicit CustomComponentManagerDialog(wxWindow* parent)
+            : wxDialog(
+                parent, wxID_ANY, wxT("自定义元件库管理"),
+                wxDefaultPosition, wxSize(680, 480),
+                wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
+        {
+            wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+
+            wxStaticText* title = new wxStaticText(
+                this, wxID_ANY,
+                wxT("新建、修改或删除用户自定义的逻辑元件"));
+            sizer->Add(title, 0, wxALL, 16);
+
+            m_list = new wxListCtrl(
+                this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_THEME);
+            m_list->InsertColumn(0, wxT("名称"), wxLIST_FORMAT_LEFT, 260);
+            m_list->InsertColumn(1, wxT("输入"), wxLIST_FORMAT_CENTER, 90);
+            m_list->InsertColumn(2, wxT("真值表"), wxLIST_FORMAT_LEFT, 180);
+            sizer->Add(m_list, 1, wxEXPAND | wxLEFT | wxRIGHT, 16);
+
+            wxBoxSizer* buttons = new wxBoxSizer(wxHORIZONTAL);
+            wxButton* add =
+                new wxButton(this, wxID_ANY, wxT("新建"));
+            wxButton* edit =
+                new wxButton(this, wxID_ANY, wxT("修改"));
+            wxButton* remove =
+                new wxButton(this, wxID_ANY, wxT("删除"));
+            wxButton* close =
+                new wxButton(this, wxID_CANCEL, wxT("关闭"));
+
+            buttons->Add(add, 0, wxRIGHT, 8);
+            buttons->Add(edit, 0, wxRIGHT, 8);
+            buttons->Add(remove, 0);
+            buttons->AddStretchSpacer();
+            buttons->Add(close, 0);
+            sizer->Add(buttons, 0, wxEXPAND | wxALL, 16);
+            SetSizer(sizer);
+
+            add->Bind(
+                wxEVT_BUTTON,
+                [this](wxCommandEvent&)
+                {
+                    CustomGateDefinition definition;
+                    definition.name = wxT("自定义元件");
+                    definition.inputCount = 2;
+                    definition.truthTable = 0;
+                    CustomGateEditorDialog dialog(this, definition);
+
+                    if (dialog.ShowModal() != wxID_OK)
+                    {
+                        return;
+                    }
+
+                    wxString error;
+
+                    if (!ComponentLibrary::AddCustomComponent(
+                            dialog.GetDefinition(), error))
+                    {
+                        wxMessageBox(
+                            error, wxT("无法保存元件"),
+                            wxOK | wxICON_ERROR, this);
+                        return;
+                    }
+
+                    RefreshList();
+                });
+            edit->Bind(
+                wxEVT_BUTTON,
+                [this](wxCommandEvent&) { EditSelected(); });
+            remove->Bind(
+                wxEVT_BUTTON,
+                [this](wxCommandEvent&) { DeleteSelected(); });
+            m_list->Bind(
+                wxEVT_LIST_ITEM_ACTIVATED,
+                [this](wxListEvent&) { EditSelected(); });
+
+            RefreshList();
+            CentreOnParent();
+        }
+
+    private:
+        long SelectedRow() const
+        {
+            return m_list->GetNextItem(
+                -1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+        }
+
+        void RefreshList()
+        {
+            m_list->DeleteAllItems();
+            const auto& components =
+                ComponentLibrary::GetCustomComponents();
+
+            for (std::size_t i = 0; i < components.size(); ++i)
+            {
+                const CustomGateDefinition& definition =
+                    components[i];
+                const long row = m_list->InsertItem(
+                    static_cast<long>(i), definition.name);
+                m_list->SetItem(
+                    row, 1,
+                    wxString::Format(
+                        wxT("%d"), definition.inputCount));
+                m_list->SetItem(
+                    row, 2,
+                    wxString::Format(
+                        wxT("0x%X"),
+                        static_cast<unsigned int>(
+                            definition.truthTable)));
+            }
+        }
+
+        void EditSelected()
+        {
+            const long row = SelectedRow();
+
+            if (row < 0)
+            {
+                wxMessageBox(
+                    wxT("请先选择一个自定义元件。"),
+                    wxT("提示"), wxOK | wxICON_INFORMATION, this);
+                return;
+            }
+
+            const std::size_t index = static_cast<std::size_t>(row);
+            CustomGateEditorDialog dialog(
+                this,
+                ComponentLibrary::GetCustomComponents()[index]);
+
+            if (dialog.ShowModal() != wxID_OK)
+            {
+                return;
+            }
+
+            wxString error;
+
+            if (!ComponentLibrary::UpdateCustomComponent(
+                    index, dialog.GetDefinition(), error))
+            {
+                wxMessageBox(
+                    error, wxT("无法修改元件"),
+                    wxOK | wxICON_ERROR, this);
+                return;
+            }
+
+            RefreshList();
+        }
+
+        void DeleteSelected()
+        {
+            const long row = SelectedRow();
+
+            if (row < 0)
+            {
+                wxMessageBox(
+                    wxT("请先选择一个自定义元件。"),
+                    wxT("提示"), wxOK | wxICON_INFORMATION, this);
+                return;
+            }
+
+            const std::size_t index = static_cast<std::size_t>(row);
+            const wxString name =
+                ComponentLibrary::GetCustomComponents()[index].name;
+
+            if (wxMessageBox(
+                    wxString::Format(
+                        wxT("确定删除自定义元件“%s”吗？\n\n")
+                        wxT("已经放在图纸中的元件不会受影响。"),
+                        name),
+                    wxT("删除自定义元件"),
+                    wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION,
+                    this) != wxYES)
+            {
+                return;
+            }
+
+            wxString error;
+
+            if (!ComponentLibrary::DeleteCustomComponent(index, error))
+            {
+                wxMessageBox(
+                    error, wxT("无法删除元件"),
+                    wxOK | wxICON_ERROR, this);
+                return;
+            }
+
+            RefreshList();
+        }
+
+        wxListCtrl* m_list = nullptr;
     };
 }
 
@@ -39,7 +500,10 @@ static wxString GateTypeName(GateType type)
     case XOR_GATE:  return wxT("异或门 (XOR)");
     case NOR_GATE:  return wxT("或非门 (NOR)");
     case XNOR_GATE: return wxT("同或门 (XNOR)");
-    default:        return wxT("逻辑门");
+    case INPUT_SWITCH: return wxT("输入开关");
+    case OUTPUT_INDICATOR: return wxT("输出指示器");
+    case CUSTOM_GATE: return wxT("自定义元件");
+    default: return wxT("逻辑门");
     }
 }
 
@@ -56,6 +520,15 @@ cMain::cMain()
     )
 {
     CreateStatusBarFields();
+
+    wxString libraryError;
+
+    if (!ComponentLibrary::LoadCustomComponents(libraryError) &&
+        !libraryError.empty())
+    {
+        SetStatusText(libraryError, 0);
+    }
+
     CreateMenuBar();
     CreateAppToolBar();
     CreateLeftPanel();
@@ -366,7 +839,7 @@ void cMain::CreateAppToolBar()
         ID_DESIGN_ALIGN_RIGHT, ID_DESIGN_ALIGN_TOP, ID_DESIGN_ALIGN_VCENTER,
         ID_DESIGN_ALIGN_BOTTOM, ID_DESIGN_DIST_H, ID_DESIGN_DIST_V,
         ID_DESIGN_GROUP, ID_DESIGN_UNGROUP,
-        ID_TOOLS_LIBRARY, ID_TOOLS_PREFS, ID_TOOLS_SHORTCUTS
+        ID_TOOLS_PREFS, ID_TOOLS_SHORTCUTS
     };
 
     for (int id : placeholders)
@@ -392,6 +865,7 @@ void cMain::CreateAppToolBar()
     BindCommand(ID_FILE_EXPORT_PNG, &cMain::OnExportPng);
     BindCommand(ID_FILE_EXPORT_VERILOG, &cMain::OnExportVerilog);
     BindCommand(ID_FILE_EXPORT_BLIF, &cMain::OnExportBlif);
+    BindCommand(ID_TOOLS_LIBRARY, &cMain::OnManageLibrary);
 
     // S 级功能
     BindCommand(ID_FILE_NEW, &cMain::OnNewDocument);
@@ -440,36 +914,7 @@ void cMain::CreateLeftPanel()
         wxDefaultSize,
         wxTR_DEFAULT_STYLE | wxTR_HAS_BUTTONS);
 
-    const wxTreeItemId root = m_componentTree->AddRoot(wxT("元件库"));//根节点
-    const wxTreeItemId gates =
-        m_componentTree->AppendItem(root, wxT("逻辑门"));//分类节点
-
-    const auto& components = ComponentLibrary::GetComponents();
-
-    for (const auto& component : components)
-    {
-        GateType gateType = AND;
-        switch (component.type)//挨个加入
-        {
-        case LibraryComponentType::AndGate:  gateType = AND; break;
-        case LibraryComponentType::OrGate:   gateType = OR; break;
-        case LibraryComponentType::NotGate:  gateType = NOT; break;
-        case LibraryComponentType::NandGate: gateType = NAND_GATE; break;
-        case LibraryComponentType::XorGate:  gateType = XOR_GATE; break;
-        case LibraryComponentType::NorGate:  gateType = NOR_GATE; break;
-        case LibraryComponentType::XnorGate: gateType = XNOR_GATE; break;
-        }
-
-        m_componentTree->AppendItem(
-            gates,
-            GateTypeName(gateType),
-            -1,
-            -1,
-            new ComponentTreeItemData(component.type));
-    }
-
-    m_componentTree->Expand(root);//根节点和分类节点默认展开
-    m_componentTree->Expand(gates);
+    PopulateComponentTree();
 
     m_componentTree->Bind(
         wxEVT_TREE_ITEM_ACTIVATED,
@@ -505,6 +950,55 @@ void cMain::CreateLeftPanel()
     sizer->Add(propValue, 0, wxLEFT | wxRIGHT | wxTOP | wxBOTTOM, 14);
 
     m_leftPanel->SetSizer(sizer);
+}
+
+void cMain::PopulateComponentTree()
+{
+    if (m_componentTree == nullptr)
+    {
+        return;
+    }
+
+    m_componentTree->DeleteAllItems();
+
+    const wxTreeItemId root =
+        m_componentTree->AddRoot(wxT("元件库"));
+    const wxTreeItemId gates =
+        m_componentTree->AppendItem(root, wxT("逻辑门"));
+
+    for (const ComponentInfo& component :
+         ComponentLibrary::GetComponents())
+    {
+        m_componentTree->AppendItem(
+            gates,
+            GateTypeName(ToGateType(component.type)),
+            -1, -1,
+            new ComponentTreeItemData(component.type));
+    }
+
+    const wxTreeItemId custom =
+        m_componentTree->AppendItem(root, wxT("自定义元件"));
+    const auto& customComponents =
+        ComponentLibrary::GetCustomComponents();
+
+    for (const CustomGateDefinition& definition : customComponents)
+    {
+        m_componentTree->AppendItem(
+            custom,
+            definition.name,
+            -1, -1,
+            new ComponentTreeItemData(definition));
+    }
+
+    if (customComponents.empty())
+    {
+        m_componentTree->AppendItem(
+            custom, wxT("（暂无，使用工具 → 元件库管理）"));
+    }
+
+    m_componentTree->Expand(root);
+    m_componentTree->Expand(gates);
+    m_componentTree->Expand(custom);
 }
 
 // ============================================================
@@ -901,6 +1395,10 @@ void cMain::OnSelectTool(wxCommandEvent&)
     drawborad->isDrawingXorGate = false;
     drawborad->isDrawingNorGate = false;
     drawborad->isDrawingXnorGate = false;
+    drawborad->isDrawingInputSwitch = false;
+    drawborad->isDrawingOutputIndicator = false;
+    drawborad->isDrawingInputSwitch = false;
+    drawborad->isDrawingOutputIndicator = false;
 
     drawborad->SetCurrentTool(TOOL_SELECT);
     drawborad->SetFocus();
@@ -967,6 +1465,8 @@ void cMain::PlaceGate(LibraryComponentType type)
     drawborad->isDrawingXorGate = false;
     drawborad->isDrawingNorGate = false;
     drawborad->isDrawingXnorGate = false;
+    drawborad->isDrawingInputSwitch = false;
+    drawborad->isDrawingOutputIndicator = false;
 
     wxString toolName;
 
@@ -1007,6 +1507,16 @@ void cMain::PlaceGate(LibraryComponentType type)
         toolName = wxT("放置 XNOR");
         break;
 
+    case LibraryComponentType::InputSwitch:
+        drawborad->isDrawingInputSwitch = true;
+        toolName = wxT("放置输入开关");
+        break;
+
+    case LibraryComponentType::OutputIndicator:
+        drawborad->isDrawingOutputIndicator = true;
+        toolName = wxT("放置输出指示器");
+        break;
+
     default:
         return;
     }
@@ -1018,6 +1528,35 @@ void cMain::PlaceGate(LibraryComponentType type)
 
     drawborad->SetFocus();
     drawborad->Refresh(false);
+}
+
+void cMain::PlaceCustomComponent(
+    const CustomGateDefinition& definition)
+{
+    if (drawborad == nullptr)
+    {
+        return;
+    }
+
+    drawborad->BeginPlaceCustom(definition);
+    UpdateToolUi(-1);
+    SetToolText(wxT("放置 ") + definition.name);
+    SetStatusText(wxT("在画布上点击以放置自定义元件"), 0);
+    drawborad->SetFocus();
+    drawborad->Refresh(false);
+}
+
+void cMain::OnManageLibrary(wxCommandEvent&)
+{
+    CustomComponentManagerDialog dialog(this);
+    dialog.ShowModal();
+    PopulateComponentTree();
+    SetStatusText(
+        wxString::Format(
+            wxT("自定义元件库：%d 个元件"),
+            static_cast<int>(
+                ComponentLibrary::GetCustomComponents().size())),
+        0);
 }
 
 // ============================================================
@@ -1037,7 +1576,14 @@ void cMain::OnLibraryItemActivated(wxTreeEvent& evt)
         return;
     }
 
-    PlaceGate(itemData->type);
+    if (itemData->isCustom)
+    {
+        PlaceCustomComponent(itemData->custom);
+    }
+    else
+    {
+        PlaceGate(itemData->type);
+    }
 }
 
 // ============================================================
@@ -1057,6 +1603,8 @@ void cMain::OnPlaceText(wxCommandEvent&)
     drawborad->isDrawingXorGate = false;
     drawborad->isDrawingNorGate = false;
     drawborad->isDrawingXnorGate = false;
+    drawborad->isDrawingInputSwitch = false;
+    drawborad->isDrawingOutputIndicator = false;
 
     drawborad->SetCurrentTool(TOOL_TEXT);
     drawborad->SetFocus();
@@ -1114,8 +1662,21 @@ void cMain::OnProperties(wxCommandEvent&)
             ? wxString::Format(wxT("U%d"), gate->id)
             : gate->label);
 
+    wxString typeName = GateTypeName(gate->type);
+    wxString truthTable;
+
+    if (const CustomGate* custom =
+            dynamic_cast<const CustomGate*>(gate))
+    {
+        typeName = wxT("自定义：") + custom->GetDefinition().name;
+        truthTable = wxString::Format(
+            wxT("0x%X"),
+            static_cast<unsigned int>(
+                custom->GetDefinition().truthTable));
+    }
+
     addRow(wxT("类型："),
-        new wxStaticText(&dialog, wxID_ANY, GateTypeName(gate->type)));
+        new wxStaticText(&dialog, wxID_ANY, typeName));
 
     addRow(wxT("标号："), labelCtrl);
 
@@ -1130,6 +1691,12 @@ void cMain::OnProperties(wxCommandEvent&)
         new wxStaticText(
             &dialog, wxID_ANY,
             wxString::Format(wxT("%d 个"), gate->GetInputCount())));
+
+    if (!truthTable.empty())
+    {
+        addRow(wxT("真值表："),
+            new wxStaticText(&dialog, wxID_ANY, truthTable));
+    }
 
     sizer->Add(grid, 1, wxEXPAND | wxALL, 16);
 

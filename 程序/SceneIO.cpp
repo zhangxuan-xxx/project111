@@ -23,6 +23,9 @@ namespace
         case XOR_GATE:  return "XOR";
         case NOR_GATE:  return "NOR";
         case XNOR_GATE: return "XNOR";
+        case INPUT_SWITCH: return "INPUT";
+        case OUTPUT_INDICATOR: return "OUTPUT";
+        case CUSTOM_GATE: return "CUSTOM";
         default:        return "AND";
         }
     }
@@ -53,6 +56,9 @@ namespace
         if (text == "XOR")                         { type = XOR_GATE;  return true; }
         if (text == "NOR" || text == "NORGATE")   { type = NOR_GATE;  return true; }
         if (text == "XNOR" || text == "XNORGATE") { type = XNOR_GATE; return true; }
+        if (text == "INPUT" || text == "INPUTSWITCH") { type = INPUT_SWITCH; return true; }
+        if (text == "OUTPUT" || text == "OUTPUTINDICATOR") { type = OUTPUT_INDICATOR; return true; }
+        if (text == "CUSTOM" || text == "CUSTOMGATE") { type = CUSTOM_GATE; return true; }
 
         return false;
     }
@@ -139,7 +145,18 @@ Gate* SceneIO::CreateGate(GateType type, const wxPoint& center)
     case XOR_GATE:  return new XORGate(center);
     case NOR_GATE:  return new NORGate(center);
     case XNOR_GATE: return new XNORGate(center);
-    default:        return new ANDGate(center);
+    case INPUT_SWITCH: return new InputSwitch(center);
+    case OUTPUT_INDICATOR: return new OutputIndicator(center);
+    case CUSTOM_GATE:
+    {
+        CustomGateDefinition definition;
+        definition.name = wxT("自定义元件");
+        definition.inputCount = 2;
+        definition.truthTable = 0;
+        return new CustomGate(center, definition);
+    }
+    default:
+        return new ANDGate(center);
     }
 }
 
@@ -183,6 +200,20 @@ bool SceneIO::Save(const wxString& path,
         item.Set("y", Json(gate->center.y));
         item.Set("label", Json(FromWx(gate->label)));
         item.Set("scale", Json(gate->scale));
+        item.Set("logicValue", Json(gate->logicValue));
+
+        if (const CustomGate* custom =
+                dynamic_cast<const CustomGate*>(gate))
+        {
+            const CustomGateDefinition& definition =
+                custom->GetDefinition();
+            Json customObject = Json::MakeObject();
+            customObject.Set("name", Json(FromWx(definition.name)));
+            customObject.Set("inputCount", Json(definition.inputCount));
+            customObject.Set("truthTable", Json(
+                static_cast<int>(definition.truthTable)));
+            item.Set("custom", std::move(customObject));
+        }
 
         gateArray.Push(std::move(item));
     }
@@ -380,16 +411,71 @@ bool SceneIO::Load(const wxString& path, SceneFileData& data,
 
         usedIds.insert(id);
 
-        Gate* gate = CreateGate(
-            type, wxPoint(
-                static_cast<int>(std::lround(x)),
-                static_cast<int>(std::lround(y))));
+        const wxPoint center(
+            static_cast<int>(std::lround(x)),
+            static_cast<int>(std::lround(y)));
+
+        Gate* gate = nullptr;
+
+        if (type == CUSTOM_GATE)
+        {
+            const Json& customObject = item["custom"];
+
+            if (!customObject.IsObject())
+            {
+                error = wxT("自定义元件缺少 custom 定义。");
+                cleanup();
+                return false;
+            }
+
+            CustomGateDefinition definition;
+            definition.name =
+                ToWx(customObject["name"].AsString());
+            definition.inputCount =
+                customObject["inputCount"].AsInt(0);
+            definition.truthTable =
+                static_cast<std::uint32_t>(
+                    customObject["truthTable"].AsInt(0));
+
+            definition.name.Trim(true);
+            definition.name.Trim(false);
+
+            const std::uint32_t validMask =
+                definition.inputCount >= 1 &&
+                definition.inputCount <= 4
+                    ? (1U << (1U << definition.inputCount)) - 1U
+                    : 0U;
+
+            if (definition.name.empty() ||
+                definition.inputCount < 1 ||
+                definition.inputCount > 4 ||
+                (definition.truthTable & ~validMask) != 0)
+            {
+                error = wxString::Format(
+                    wxT("自定义元件的名称、输入数量或真值表无效。")
+                    wxT("（name=%s, inputs=%d, truth=0x%X, mask=0x%X）"),
+                    definition.name,
+                    definition.inputCount,
+                    static_cast<unsigned int>(definition.truthTable),
+                    static_cast<unsigned int>(validMask));
+                cleanup();
+                return false;
+            }
+
+            gate = new CustomGate(center, definition);
+        }
+        else
+        {
+            gate = CreateGate(type, center);
+        }
 
         gate->id = id;
         gate->label = ToWx(item["label"].AsString());
 
         const double scale = item["scale"].AsDouble(1.0);
         gate->scale = wxMin(wxMax(scale, 0.2), 5.0);
+        gate->logicValue = item["logicValue"].AsBool(false);
+        gate->logicValid = gate->type == INPUT_SWITCH;
 
         result.gates.push_back(gate);
     }

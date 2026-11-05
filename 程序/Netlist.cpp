@@ -267,8 +267,15 @@ namespace
             {
                 const Gate* gate = m_gates[i];
 
-                const wxPoint out = gate->GetOutputPort();
-                m_outNode[i] = addNode(out.x, out.y);
+                if (gate->type == OUTPUT_INDICATOR)
+                {
+                    m_outNode[i] = -1;
+                }
+                else
+                {
+                    const wxPoint out = gate->GetOutputPort();
+                    m_outNode[i] = addNode(out.x, out.y);
+                }
 
                 const int inputs = gate->GetInputCount();
                 m_inNodes[i].resize(static_cast<std::size_t>(inputs), -1);
@@ -371,7 +378,7 @@ namespace
 
             std::map<int, int> driverCount;
 
-            auto addPort = [&nets, &driverCount](int node, int gate, int port,
+            auto addPort = [this, &nets, &driverCount](int node, int gate, int port,
                                                  bool output)
             {
                 const int root = node;
@@ -379,24 +386,40 @@ namespace
 
                 if (output)
                 {
-                    ++driverCount[root];
-
-                    if (net.driverGate < 0)
+                    if (m_gates[gate]->type == INPUT_SWITCH)
                     {
-                        net.driverGate = gate;
+                        net.primaryInput = true;
+                    }
+                    else
+                    {
+                        ++driverCount[root];
+                        if (net.driverGate < 0)
+                        {
+                            net.driverGate = gate;
+                        }
                     }
                 }
                 else
                 {
-                    net.sinks.emplace_back(gate, port);
+                    if (m_gates[gate]->type == OUTPUT_INDICATOR)
+                    {
+                        net.primaryOutput = true;
+                    }
+                    else
+                    {
+                        net.sinks.emplace_back(gate, port);
+                    }
                 }
             };
 
             // 端口节点先求根再挂到对应网络
             for (std::size_t i = 0; i < m_gates.size(); ++i)
             {
-                const int outRoot = find(m_outNode[i]);
-                addPort(outRoot, static_cast<int>(i), -1, true);
+                if (m_outNode[i] >= 0)
+                {
+                    const int outRoot = find(m_outNode[i]);
+                    addPort(outRoot, static_cast<int>(i), -1, true);
+                }
 
                 for (std::size_t k = 0; k < m_inNodes[i].size(); ++k)
                 {
@@ -436,9 +459,10 @@ namespace
                 }
 
                 Net copy = net;
-                copy.primaryInput = (driverCount[root] == 0);
-                copy.primaryOutput = (driverCount[root] > 0 &&
-                                      copy.sinks.empty());
+                copy.primaryInput = copy.primaryInput ||
+                    (driverCount[root] == 0 && !copy.primaryOutput);
+                copy.primaryOutput = copy.primaryOutput ||
+                    (driverCount[root] > 0 && copy.sinks.empty());
 
                 m_rootToIndex[root] = static_cast<int>(m_nets.size());
                 m_nets.push_back(std::move(copy));
@@ -458,7 +482,8 @@ namespace
 
             for (std::size_t i = 0; i < m_gates.size(); ++i)
             {
-                m_outNet[i] = m_rootToIndex[find(m_outNode[i])];
+                m_outNet[i] = m_outNode[i] >= 0
+                    ? m_rootToIndex[find(m_outNode[i])] : -1;
 
                 m_inNets[i].resize(m_inNodes[i].size(), -1);
 
@@ -698,6 +723,102 @@ bool Netlist::ExportVerilog(const wxString& path,
     {
         const Gate& gate = builder.GateAt(i);
 
+        if (gate.type == INPUT_SWITCH || gate.type == OUTPUT_INDICATOR)
+        {
+            continue;
+        }
+
+        if (gate.type == CUSTOM_GATE)
+        {
+            const CustomGate* custom =
+                dynamic_cast<const CustomGate*>(&gate);
+            const int outNet = builder.OutputNet(i);
+
+            if (custom == nullptr || outNet < 0)
+            {
+                error = wxT("自定义元件缺少有效输出网络，无法导出 Verilog。");
+                return false;
+            }
+
+            const CustomGateDefinition& definition =
+                custom->GetDefinition();
+            std::vector<std::string> terms;
+
+            for (int row = 0;
+                 row < (1 << definition.inputCount);
+                 ++row)
+            {
+                if (((definition.truthTable >> row) & 1U) == 0)
+                {
+                    continue;
+                }
+
+                std::vector<std::string> factors;
+
+                for (int port = 0;
+                     port < definition.inputCount;
+                     ++port)
+                {
+                    const int net = builder.InputNets(i)[port];
+
+                    if (net < 0)
+                    {
+                        error =
+                            wxT("自定义元件存在未连接的输入端，无法导出 Verilog。");
+                        return false;
+                    }
+
+                    const bool one =
+                        ((row >> (definition.inputCount - 1 - port)) & 1) != 0;
+                    factors.push_back(
+                        (one ? "" : "~") +
+                        builder.Nets()[net].name);
+                }
+
+                std::string term;
+
+                for (std::size_t factor = 0;
+                     factor < factors.size();
+                     ++factor)
+                {
+                    if (factor > 0)
+                    {
+                        term += " & ";
+                    }
+
+                    term += factors[factor];
+                }
+
+                terms.push_back("(" + term + ")");
+            }
+
+            text += "    assign ";
+            text += builder.Nets()[outNet].name;
+            text += " = ";
+
+            if (terms.empty())
+            {
+                text += "1'b0";
+            }
+            else
+            {
+                for (std::size_t term = 0;
+                     term < terms.size();
+                     ++term)
+                {
+                    if (term > 0)
+                    {
+                        text += " | ";
+                    }
+
+                    text += terms[term];
+                }
+            }
+
+            text += ";\n";
+            continue;
+        }
+
         text += "    ";
         text += PrimitiveName(gate.type);
         text += " ";
@@ -829,8 +950,69 @@ bool Netlist::ExportBlif(const wxString& path,
         const Gate& gate = builder.GateAt(i);
         const int outNet = builder.OutputNet(i);
 
-        if (outNet < 0)
+        if (outNet < 0 || gate.type == INPUT_SWITCH ||
+            gate.type == OUTPUT_INDICATOR)
         {
+            continue;
+        }
+
+        if (gate.type == CUSTOM_GATE)
+        {
+            const CustomGate* custom =
+                dynamic_cast<const CustomGate*>(&gate);
+
+            if (custom == nullptr)
+            {
+                error = wxT("无法识别自定义元件，不能导出 BLIF。");
+                return false;
+            }
+
+            const CustomGateDefinition& definition =
+                custom->GetDefinition();
+
+            text += ".names";
+
+            for (int port = 0;
+                 port < definition.inputCount;
+                 ++port)
+            {
+                const int net = builder.InputNets(i)[port];
+
+                if (net < 0)
+                {
+                    error =
+                        wxT("自定义元件存在未连接的输入端，无法导出 BLIF。");
+                    return false;
+                }
+
+                text += " " + builder.Nets()[net].name;
+            }
+
+            text += " " + builder.Nets()[outNet].name + "\n";
+
+            for (int row = 0;
+                 row < (1 << definition.inputCount);
+                 ++row)
+            {
+                if (((definition.truthTable >> row) & 1U) == 0)
+                {
+                    continue;
+                }
+
+                std::string pattern;
+
+                for (int port = 0;
+                     port < definition.inputCount;
+                     ++port)
+                {
+                    pattern +=
+                        ((row >> (definition.inputCount - 1 - port)) & 1)
+                            ? '1' : '0';
+                }
+
+                text += pattern + " 1\n";
+            }
+
             continue;
         }
 

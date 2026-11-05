@@ -25,7 +25,7 @@ struct SceneFileData
 namespace SceneIO
 {
     // 当前文件格式版本（写入时使用）
-    const int kFormatVersion = 1;
+    const int kFormatVersion = 3;
 
     // 保存图纸；失败时 error 带原因
     bool Save(const wxString& path,

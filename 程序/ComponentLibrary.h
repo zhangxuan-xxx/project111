@@ -1,6 +1,7 @@
 #pragma once
 
 #include <wx/wx.h>
+#include <cstddef>
 #include <vector>
 #include "compoent.h"
 
@@ -15,7 +16,9 @@ enum class LibraryComponentType
     NandGate,
     XorGate,
     NorGate,
-    XnorGate
+    XnorGate,
+    InputSwitch,
+    OutputIndicator
 };
 
 // ============================================================
@@ -41,4 +44,20 @@ public:
         LibraryComponentType type,
         const wxPoint& position
     );
+
+    // 用户自定义组合逻辑元件
+    static const std::vector<CustomGateDefinition>& GetCustomComponents();
+    static bool LoadCustomComponents(wxString& error);
+    static bool SaveCustomComponents(wxString& error);
+    static bool AddCustomComponent(
+        const CustomGateDefinition& definition,
+        wxString& error);
+    static bool UpdateCustomComponent(
+        std::size_t index,
+        const CustomGateDefinition& definition,
+        wxString& error);
+    static bool DeleteCustomComponent(
+        std::size_t index,
+        wxString& error);
+    static wxString GetCustomLibraryPath();
 };
