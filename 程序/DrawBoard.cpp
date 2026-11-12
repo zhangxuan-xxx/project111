@@ -7,7 +7,6 @@
 #include <climits>
 #include <cmath>
 #include <functional>
-
 #include <unordered_map>
 #include <utility>
 
@@ -955,6 +954,25 @@ void DrawBoard::OnMouseDown(wxMouseEvent& event)//实际点击时放置元件
         NotifyToolChanged(0);
         return;
     }
+    if (isDrawingInputSwitch || isDrawingOutputIndicator)
+    {
+        Gate* ioGate = isDrawingInputSwitch
+            ? static_cast<Gate*>(new InputSwitch(placePos))
+            : static_cast<Gate*>(new OutputIndicator(placePos));
+        ioGate->id = m_nextGateId++;
+        Gates.push_back(ioGate);
+        m_selectedGate = ioGate;
+        m_selectedText = -1;
+        m_draggingGate = false;
+        MarkModified();
+        isDrawingInputSwitch = false;
+        isDrawingOutputIndicator = false;
+        SetCurrentTool(TOOL_SELECT);
+        Refresh(false);
+        NotifyToolChanged(0);
+        return;
+    }
+
     if (isDrawingInputSwitch || isDrawingOutputIndicator)
     {
         Gate* ioGate = isDrawingInputSwitch

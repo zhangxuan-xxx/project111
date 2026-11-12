@@ -201,7 +201,6 @@ bool SceneIO::Save(const wxString& path,
         item.Set("label", Json(FromWx(gate->label)));
         item.Set("scale", Json(gate->scale));
         item.Set("logicValue", Json(gate->logicValue));
-
         if (const CustomGate* custom =
                 dynamic_cast<const CustomGate*>(gate))
         {
