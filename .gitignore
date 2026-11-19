@@ -19,3 +19,10 @@ Release/
 *.user
 *.userosscache
 *.sln.docstates
+
+# 本地构建与测试产物
+.build/
+netlist-test-output.net
+
+# 本地生成交付物（PPT/Word）
+output/

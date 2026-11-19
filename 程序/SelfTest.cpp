@@ -1,4 +1,4 @@
-#include "SelfTest.h"
+﻿#include "SelfTest.h"
 
 #include <wx/filename.h>
 #include <wx/frame.h>
@@ -224,6 +224,125 @@ int RunSelfTest(const wxString& logPath)
 
             report.Check(
                 blifSummary.instances == 3, "BLIF instances == 3");
+        }
+    }
+
+    // --------------------------------------------------------
+    // 3.05 KiCad PCB 网表：真实封装、引脚与电源网络
+    // --------------------------------------------------------
+    {
+        InputSwitch* inputA = new InputSwitch(wxPoint(160, 180));
+        inputA->id = 401;
+        inputA->label = wxT("SW1");
+
+        InputSwitch* inputB = new InputSwitch(wxPoint(160, 320));
+        inputB->id = 402;
+        inputB->label = wxT("SW2");
+
+        Gate* andGate = SceneIO::CreateGate(AND, wxPoint(420, 240));
+        andGate->id = 403;
+        andGate->label = wxT("U1");
+
+        OutputIndicator* output = new OutputIndicator(wxPoint(700, 240));
+        output->id = 404;
+        output->label = wxT("J1");
+
+        std::vector<Gate*> pcbGates = {
+            inputA, inputB, andGate, output
+        };
+
+        std::vector<Wire> pcbWires(3);
+
+        pcbWires[0].start = inputA->GetOutputPort();
+        pcbWires[0].end = andGate->GetInputPort(0);
+        pcbWires[0].startComponentId = inputA->id;
+        pcbWires[0].endComponentId = andGate->id;
+        pcbWires[0].endPortIndex = 0;
+
+        pcbWires[1].start = inputB->GetOutputPort();
+        pcbWires[1].end = andGate->GetInputPort(1);
+        pcbWires[1].startComponentId = inputB->id;
+        pcbWires[1].endComponentId = andGate->id;
+        pcbWires[1].endPortIndex = 1;
+
+        pcbWires[2].start = andGate->GetOutputPort();
+        pcbWires[2].end = output->GetInputPort(0);
+        pcbWires[2].startComponentId = andGate->id;
+        pcbWires[2].endComponentId = output->id;
+        pcbWires[2].endPortIndex = 0;
+
+        const wxString kicadPath =
+            TempFile(wxT("drawgate-selftest-kicad.net"));
+
+        NetlistSummary pcbSummary;
+        wxString pcbError;
+
+        const bool pcbOk = Netlist::ExportKicad(
+            kicadPath, pcbGates, pcbWires,
+            wxT("selftest_pcb"), pcbSummary, pcbError);
+
+        report.Check(
+            pcbOk,
+            "Export KiCad PCB netlist: " + ToUtf8(pcbError));
+
+        if (pcbOk)
+        {
+            const std::string text = ReadFile(kicadPath);
+
+            report.Check(
+                pcbSummary.instances == 4,
+                "KiCad PCB instances == 4");
+            report.Check(
+                pcbSummary.inputs == 2 &&
+                pcbSummary.outputs == 1,
+                "KiCad PCB primary I/O == 2/1");
+            report.Check(
+                pcbSummary.nets == 5,
+                "KiCad PCB nets include VCC and GND");
+            report.Check(
+                text.find("(value \"74HC08\")") != std::string::npos &&
+                text.find(
+                    "(footprint \"Package_DIP:DIP-14_W7.62mm\")") !=
+                    std::string::npos,
+                "KiCad PCB gate maps to 74HC08 footprint");
+            report.Check(
+                text.find("(name \"VCC\")") != std::string::npos &&
+                text.find("(name \"GND\")") != std::string::npos,
+                "KiCad PCB contains power nets");
+            report.Check(
+                text.find("(node (ref \"U1\") (pin \"3\"))") !=
+                    std::string::npos,
+                "KiCad PCB contains physical pin nodes");
+
+            int depth = 0;
+            bool balanced = true;
+
+            for (char ch : text)
+            {
+                if (ch == '(')
+                {
+                    ++depth;
+                }
+                else if (ch == ')')
+                {
+                    --depth;
+
+                    if (depth < 0)
+                    {
+                        balanced = false;
+                        break;
+                    }
+                }
+            }
+
+            report.Check(
+                balanced && depth == 0,
+                "KiCad PCB S-expression is balanced");
+        }
+
+        for (Gate* gate : pcbGates)
+        {
+            delete gate;
         }
     }
 

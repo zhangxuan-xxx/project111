@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <wx/wx.h>
 #include <wx/treectrl.h>
@@ -61,6 +61,7 @@ private:
     void OnExportPng(wxCommandEvent& evt);
     void OnExportVerilog(wxCommandEvent& evt);
     void OnExportBlif(wxCommandEvent& evt);
+    void OnExportKicad(wxCommandEvent& evt);
     void OnClose(wxCloseEvent& evt);
 
     void OpenWithDialog(const wxString& title);

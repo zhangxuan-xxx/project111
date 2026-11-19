@@ -1,4 +1,4 @@
-#include "Netlist.h"
+﻿#include "Netlist.h"
 
 #include <wx/datetime.h>
 #include <wx/file.h>
@@ -607,6 +607,129 @@ namespace
 
         return text;
     }
+
+    // ========================================================
+    // KiCad PCB 网表映射
+    // ========================================================
+    struct PcbPinMap
+    {
+        std::string value;
+        std::string footprint;
+        std::string library;
+        std::string part;
+        std::vector<int> inputPins;
+        int outputPin = -1;
+        int vccPin = -1;
+        int gndPin = -1;
+        std::vector<int> unusedInputPins;
+    };
+
+    struct PcbNetNode
+    {
+        std::string ref;
+        int pin = -1;
+    };
+
+    bool DescribePcbPart(const Gate& gate, const std::string& ref,
+                         PcbPinMap& part, wxString& error)
+    {
+        const std::string dip14 = "Package_DIP:DIP-14_W7.62mm";
+        const std::string connectorFootprint =
+            "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical";
+
+        switch (gate.type)
+        {
+        case AND:
+            part = { "74HC08", dip14, "74xx", "74HC08",
+                     { 1, 2 }, 3, 14, 7, { 4, 5, 9, 10, 12, 13 } };
+            return true;
+        case OR:
+            part = { "74HC32", dip14, "74xx", "74HC32",
+                     { 1, 2 }, 3, 14, 7, { 4, 5, 9, 10, 12, 13 } };
+            return true;
+        case NOT:
+            part = { "74HC04", dip14, "74xx", "74HC04",
+                     { 1 }, 2, 14, 7, { 3, 5, 9, 11, 13 } };
+            return true;
+        case NAND_GATE:
+            part = { "74HC00", dip14, "74xx", "74HC00",
+                     { 1, 2 }, 3, 14, 7, { 4, 5, 9, 10, 12, 13 } };
+            return true;
+        case XOR_GATE:
+            part = { "74HC86", dip14, "74xx", "74HC86",
+                     { 1, 2 }, 3, 14, 7, { 4, 5, 9, 10, 12, 13 } };
+            return true;
+        case NOR_GATE:
+            // 74HC02 的 1Y 位于引脚 1，1A/1B 位于引脚 2/3。
+            part = { "74HC02", dip14, "74xx", "74HC02",
+                     { 2, 3 }, 1, 14, 7, { 5, 6, 8, 9, 11, 12 } };
+            return true;
+        case XNOR_GATE:
+            part = { "74HC7266", dip14, "74xx", "74HC7266",
+                     { 1, 2 }, 3, 14, 7, { 4, 5, 9, 10, 12, 13 } };
+            return true;
+        case INPUT_SWITCH:
+            part = { "INPUT_CONN", connectorFootprint,
+                     "Connector_Generic", "Conn_01x01",
+                     {}, 1, -1, -1, {} };
+            return true;
+        case OUTPUT_INDICATOR:
+            part = { "OUTPUT_CONN", connectorFootprint,
+                     "Connector_Generic", "Conn_01x01",
+                     { 1 }, -1, -1, -1, {} };
+            return true;
+        case CUSTOM_GATE:
+            error = wxString::Format(
+                wxT("元件 %s 是自定义逻辑，尚未提供真实器件与封装映射，")
+                wxT("不能导出可布板的 KiCad 网表。"),
+                wxString::FromUTF8(ref.c_str()));
+            return false;
+        default:
+            error = wxT("存在未知元件类型，无法映射到 PCB 封装。");
+            return false;
+        }
+    }
+
+    std::string EscapeSexpr(const std::string& value)
+    {
+        std::string escaped;
+        escaped.reserve(value.size() + 8);
+
+        for (char ch : value)
+        {
+            if (ch == '\\' || ch == '"')
+            {
+                escaped.push_back('\\');
+            }
+
+            escaped.push_back(ch);
+        }
+
+        return escaped;
+    }
+
+    std::string PcbTstamp(std::size_t index)
+    {
+        return FromWx(wxString::Format(
+            "00000000-0000-0000-0000-%012llx",
+            static_cast<unsigned long long>(index + 1)));
+    }
+
+    int CountPrimary(const std::vector<Net>& nets, bool input)
+    {
+        int count = 0;
+
+        for (const Net& net : nets)
+        {
+            if (input ? net.primaryInput : net.primaryOutput)
+            {
+                ++count;
+            }
+        }
+
+        return count;
+    }
+
 }
 
 // ============================================================
@@ -1059,6 +1182,232 @@ bool Netlist::ExportBlif(const wxString& path,
         }
     }
 
+    summary.warnings = builder.WarningCount();
+    return true;
+}
+
+// ============================================================
+// KiCad PCB 网表导出
+// ============================================================
+bool Netlist::ExportKicad(const wxString& path,
+                          const std::vector<Gate*>& gates,
+                          const std::vector<Wire>& wires,
+                          const wxString& designNameRaw,
+                          NetlistSummary& summary,
+                          wxString& error)
+{
+    Builder builder(gates, wires);
+
+    if (!builder.Build(error))
+    {
+        return false;
+    }
+
+    std::vector<PcbPinMap> parts(builder.GateCount());
+    std::vector<std::vector<PcbNetNode>> netNodes(builder.Nets().size());
+    std::vector<int> driverCounts(builder.Nets().size(), 0);
+
+    for (std::size_t i = 0; i < builder.GateCount(); ++i)
+    {
+        const Gate& gate = builder.GateAt(i);
+        const std::string& ref = builder.RefAt(i);
+
+        if (!DescribePcbPart(gate, ref, parts[i], error))
+        {
+            return false;
+        }
+
+        const std::vector<int>& inputs = builder.InputNets(i);
+
+        if (inputs.size() != parts[i].inputPins.size())
+        {
+            error = wxString::Format(
+                wxT("元件 %s 的输入端口数量与封装引脚映射不一致。"),
+                wxString::FromUTF8(ref.c_str()));
+            return false;
+        }
+
+        for (std::size_t pin = 0; pin < inputs.size(); ++pin)
+        {
+            if (inputs[pin] < 0)
+            {
+                error = wxString::Format(
+                    wxT("元件 %s 的输入 %zu 未连接，无法生成可布板网表。"),
+                    wxString::FromUTF8(ref.c_str()), pin + 1);
+                return false;
+            }
+
+            netNodes[inputs[pin]].push_back(
+                { ref, parts[i].inputPins[pin] });
+        }
+
+        const int outputNet = builder.OutputNet(i);
+
+        if (outputNet >= 0 && parts[i].outputPin >= 0)
+        {
+            netNodes[outputNet].push_back(
+                { ref, parts[i].outputPin });
+            ++driverCounts[outputNet];
+        }
+    }
+
+    for (std::size_t i = 0; i < netNodes.size(); ++i)
+    {
+        if (!netNodes[i].empty() && driverCounts[i] == 0)
+        {
+            error = wxString::Format(
+                wxT("网络 %s 没有驱动源，无法生成 KiCad 网表。"),
+                wxString::FromUTF8(builder.Nets()[i].name.c_str()));
+            return false;
+        }
+
+        if (driverCounts[i] > 1)
+        {
+            error = wxString::Format(
+                wxT("网络 %s 连接了 %d 个输出端，存在多驱动，")
+                wxT("请修正电路后再导出 PCB 网表。"),
+                wxString::FromUTF8(builder.Nets()[i].name.c_str()),
+                driverCounts[i]);
+            return false;
+        }
+    }
+
+    std::vector<PcbNetNode> vccNodes;
+    std::vector<PcbNetNode> gndNodes;
+
+    for (std::size_t i = 0; i < parts.size(); ++i)
+    {
+        const PcbPinMap& part = parts[i];
+        const std::string& ref = builder.RefAt(i);
+
+        if (part.vccPin >= 0)
+        {
+            vccNodes.push_back({ ref, part.vccPin });
+        }
+
+        if (part.gndPin >= 0)
+        {
+            gndNodes.push_back({ ref, part.gndPin });
+        }
+
+        for (int pin : part.unusedInputPins)
+        {
+            gndNodes.push_back({ ref, pin });
+        }
+    }
+
+    const std::string designName = SanitizeIdentifier(
+        designNameRaw, "drawgate_pcb");
+    const std::string date = FromWx(
+        wxDateTime::Now().Format("%Y-%m-%dT%H:%M:%S"));
+
+    std::string text;
+    text += "(export (version \"E\")\n";
+    text += "  (design\n";
+    text += "    (source \"" + EscapeSexpr(designName) + "\")\n";
+    text += "    (date \"" + date + "\")\n";
+    text += "    (tool \"DrawGate\")\n";
+    text += "    (sheet (number \"1\") (name \"/\") (tstamps \"/\")\n";
+    text += "      (title_block\n";
+    text += "        (title \"" + EscapeSexpr(designName) + "\")\n";
+    text += "        (company \"DrawGate\")\n";
+    text += "        (rev \"1.1\")\n";
+    text += "        (date \"\")\n";
+    text += "        (source \"" + EscapeSexpr(designName) + ".net\"))))\n";
+    text += "  (components\n";
+
+    for (std::size_t i = 0; i < builder.GateCount(); ++i)
+    {
+        const PcbPinMap& part = parts[i];
+        const std::string& ref = builder.RefAt(i);
+
+        text += "    (comp (ref \"" + EscapeSexpr(ref) + "\")\n";
+        text += "      (value \"" + EscapeSexpr(part.value) + "\")\n";
+        text += "      (footprint \"" +
+            EscapeSexpr(part.footprint) + "\")\n";
+        text += "      (datasheet \"~\")\n";
+        text += "      (libsource (lib \"" +
+            EscapeSexpr(part.library) + "\") (part \"" +
+            EscapeSexpr(part.part) + "\"))\n";
+        text += "      (property (name \"Sheetname\") (value \"\"))\n";
+        text += "      (property (name \"Sheetfile\") (value \"" +
+            EscapeSexpr(designName) + ".net\"))\n";
+        text += "      (sheetpath (names \"/\") (tstamps \"/\"))\n";
+        text += "      (tstamps \"" + PcbTstamp(i) + "\"))\n";
+    }
+
+    text += "  )\n";
+    text += "  (libparts)\n";
+    text += "  (libraries)\n";
+    text += "  (nets\n";
+
+    int netCode = 1;
+    int logicalNetCount = 0;
+
+    for (std::size_t i = 0; i < netNodes.size(); ++i)
+    {
+        if (netNodes[i].empty())
+        {
+            continue;
+        }
+
+        const Net& net = builder.Nets()[i];
+        text += "    (net (code \"" + std::to_string(netCode++) +
+            "\") (name \"" + EscapeSexpr(net.name) + "\")\n";
+
+        std::set<std::pair<std::string, int>> emitted;
+
+        for (const PcbNetNode& node : netNodes[i])
+        {
+            if (!emitted.insert({ node.ref, node.pin }).second)
+            {
+                continue;
+            }
+
+            text += "      (node (ref \"" + EscapeSexpr(node.ref) +
+                "\") (pin \"" + std::to_string(node.pin) + "\"))\n";
+        }
+
+        text += "    )\n";
+        ++logicalNetCount;
+    }
+
+    auto appendPowerNet = [&text, &netCode](
+        const std::string& name, const std::vector<PcbNetNode>& nodes)
+    {
+        if (nodes.empty())
+        {
+            return;
+        }
+
+        text += "    (net (code \"" + std::to_string(netCode++) +
+            "\") (name \"" + name + "\")\n";
+
+        for (const PcbNetNode& node : nodes)
+        {
+            text += "      (node (ref \"" + EscapeSexpr(node.ref) +
+                "\") (pin \"" + std::to_string(node.pin) + "\"))\n";
+        }
+
+        text += "    )\n";
+    };
+
+    appendPowerNet("VCC", vccNodes);
+    appendPowerNet("GND", gndNodes);
+
+    text += "  )\n";
+    text += ")\n";
+
+    if (!WriteTextFile(path, text, error))
+    {
+        return false;
+    }
+
+    summary.instances = static_cast<int>(builder.GateCount());
+    summary.nets = logicalNetCount + (vccNodes.empty() ? 0 : 1) +
+        (gndNodes.empty() ? 0 : 1);
+    summary.inputs = CountPrimary(builder.Nets(), true);
+    summary.outputs = CountPrimary(builder.Nets(), false);
     summary.warnings = builder.WarningCount();
     return true;
 }

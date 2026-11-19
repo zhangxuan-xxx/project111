@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // Netlist.h —— 从画布提取连通性，导出 Verilog / BLIF 网表
 // ============================================================
 #pragma once
@@ -36,4 +36,13 @@ namespace Netlist
                     const wxString& moduleName,
                     NetlistSummary& summary,
                     wxString& error);
+
+    // 导出 KiCad S-expression 网表（.net），供 PCB 编辑器导入。
+    // 逻辑门映射到 74HC 系列封装，输入/输出映射为单针接口。
+    bool ExportKicad(const wxString& path,
+                     const std::vector<Gate*>& gates,
+                     const std::vector<Wire>& wires,
+                     const wxString& designName,
+                     NetlistSummary& summary,
+                     wxString& error);
 }

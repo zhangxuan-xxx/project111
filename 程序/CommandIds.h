@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <wx/defs.h>
 
@@ -21,6 +21,7 @@ enum
     ID_FILE_IMPORT_DGATE,
     ID_FILE_EXPORT_VERILOG,
     ID_FILE_EXPORT_BLIF,
+    ID_FILE_EXPORT_KICAD,
     ID_FILE_EXIT,
 
     // 编辑

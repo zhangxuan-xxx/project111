@@ -1,4 +1,4 @@
-#include "cMain.h"
+﻿#include "cMain.h"
 
 #include <wx/grid.h>
 #include <wx/filename.h>
@@ -652,6 +652,7 @@ void cMain::CreateMenuBar()
     wxMenu* netlistMenu = new wxMenu();
     item(netlistMenu, ID_FILE_EXPORT_VERILOG, wxT("Verilog 结构网表 (*.v)..."));
     item(netlistMenu, ID_FILE_EXPORT_BLIF, wxT("BLIF 网表 (*.blif)..."));
+    item(netlistMenu, ID_FILE_EXPORT_KICAD, wxT("KiCad PCB 网表 (*.net)..."));
     fileMenu->AppendSubMenu(netlistMenu, wxT("导出网表"));
 
     fileMenu->AppendSeparator();
@@ -865,6 +866,7 @@ void cMain::CreateAppToolBar()
     BindCommand(ID_FILE_EXPORT_PNG, &cMain::OnExportPng);
     BindCommand(ID_FILE_EXPORT_VERILOG, &cMain::OnExportVerilog);
     BindCommand(ID_FILE_EXPORT_BLIF, &cMain::OnExportBlif);
+    BindCommand(ID_FILE_EXPORT_KICAD, &cMain::OnExportKicad);
     BindCommand(ID_TOOLS_LIBRARY, &cMain::OnManageLibrary);
 
     // S 级功能
@@ -1213,8 +1215,10 @@ void cMain::OnShowManual(wxCommandEvent&)
         wxT("  · 打开 (Ctrl+O) / 导入：读取 .dgate 图纸并替换当前画布。\n")
         wxT("  · 保存 (Ctrl+S) / 另存为：把图纸存成 .dgate（JSON 文本）。\n")
         wxT("  · 导出 → PNG 图片：把画布内容导出为位图（自动裁边）。\n")
-        wxT("  · 导出网表 → Verilog / BLIF：把连线关系导出为网表，\n")
+        wxT("  · 导出网表 → Verilog / BLIF：把连线关系导出为逻辑网表，\n")
         wxT("    可直接交给 Icarus Verilog、Yosys、ABC 等工具。\n")
+        wxT("  · 导出网表 → KiCad PCB 网表：生成 .net 文件，\n")
+        wxT("    可在 KiCad PCB 编辑器中导入，继续分配封装与布线。\n")
         wxT("  · 网表的顶层输入 / 输出由「悬空端口」自动生成，\n")
         wxT("    命名为 in1… / out1…。\n\n")
         wxT("六、帮助\n")
@@ -1358,7 +1362,7 @@ void cMain::OnAbout(wxCommandEvent&)
     wxMessageBox(
         wxT("DrawGate - 逻辑门绘图\n\n")
         wxT("wxWidgets + MSVC 课程项目\n")
-        wxT("当前版本：1.0（界面 + 文件读写 + 网表导出）"),
+        wxT("当前版本：1.1（界面 + 文件读写 + 逻辑网表 + KiCad PCB 网表）"),
         wxT("关于 DrawGate"),
         wxOK | wxICON_INFORMATION,
         this);
@@ -2190,6 +2194,65 @@ void cMain::OnExportBlif(wxCommandEvent&)
     }
 
     ShowExportSummary(wxT("BLIF"), summary, path);
+}
+
+void cMain::OnExportKicad(wxCommandEvent&)
+{
+    if (drawborad == nullptr)
+    {
+        return;
+    }
+
+    if (drawborad->GetGates().empty())
+    {
+        wxMessageBox(
+            wxT("画布上没有元件，无法导出 PCB 网表。"),
+            wxT("导出 KiCad 网表"),
+            wxOK | wxICON_INFORMATION,
+            this);
+        return;
+    }
+
+    wxFileDialog dialog(
+        this,
+        wxT("导出 KiCad PCB 网表"),
+        wxEmptyString,
+        DefaultFileName(wxT("net")),
+        wxT("KiCad 网表 (*.net)|*.net"),
+        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+    if (dialog.ShowModal() != wxID_OK)
+    {
+        return;
+    }
+
+    wxString path = dialog.GetPath();
+
+    if (wxFileName(path).GetExt().empty())
+    {
+        path += wxT(".net");
+    }
+
+    NetlistSummary summary;
+    wxString error;
+
+    if (!Netlist::ExportKicad(
+            path,
+            drawborad->GetGates(),
+            drawborad->GetWires(),
+            wxFileName(path).GetName(),
+            summary,
+            error))
+    {
+        wxMessageBox(
+            wxT("导出失败：\n\n") + error,
+            wxT("导出 KiCad 网表"),
+            wxOK | wxICON_ERROR,
+            this);
+        return;
+    }
+
+    ShowExportSummary(wxT("KiCad PCB"), summary, path);
 }
 
 // ============================================================
