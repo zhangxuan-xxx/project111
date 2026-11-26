@@ -164,6 +164,34 @@ void DrawBoard::RenderScene(wxMemoryDC& memDC, const wxSize& size, bool exportMo
         }
     }
 
+    // 统一标出可连接端口：红圈表示输入和输出端口的位置
+    memDC.SetPen(wxPen(wxColour(210, 35, 35), 2));
+    memDC.SetBrush(wxBrush(wxColour(255, 245, 245)));
+
+    for (const Gate* gate : Gates)
+    {
+        if (gate == nullptr)
+        {
+            continue;
+        }
+
+        const int radius = std::max(
+            3, static_cast<int>(std::lround(4 * gate->scale)));
+
+        for (int port = 0;
+             port < gate->GetInputCount();
+             ++port)
+        {
+            memDC.DrawCircle(gate->GetInputPort(port), radius);
+        }
+
+        // 输出指示器只有输入端，其 GetOutputPort() 返回中心点，不能画输出圈
+        if (gate->type != OUTPUT_INDICATOR)
+        {
+            memDC.DrawCircle(gate->GetOutputPort(), radius);
+        }
+    }
+
     // 绘制元件标号（为空时自动显示 U<id>）
     memDC.SetFont(wxFont(
         9, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL,
